@@ -1,0 +1,13 @@
+build/
+vendor/gbdk/
+.DS_Store
+*.lst
+*.map
+*.sym
+*.ihx
+*.cdb
+*.adb
+*.lk
+*.rel
+*.o
+*.asm
