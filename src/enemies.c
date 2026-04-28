@@ -10,9 +10,23 @@ typedef struct {
     u8 wp_idx;
     u8 anim;
     u8 alive;
+    u8 type;       /* iter-2: ENEMY_BUG | ENEMY_ROBOT */
     u8 gen;        /* generation counter; bumped on spawn so projectiles can
                     * detect their target slot was reused by a different bug */
 } enemy_t;
+
+typedef struct {
+    u8   hp;
+    fix8 speed;
+    u8   bounty;
+    u8   spr_a;
+    u8   spr_b;
+} enemy_stats_t;
+
+static const enemy_stats_t s_enemy_stats[ENEMY_TYPE_COUNT] = {
+    { BUG_HP,   BUG_SPEED,   BUG_BOUNTY,   SPR_BUG_A,   SPR_BUG_B   },
+    { ROBOT_HP, ROBOT_SPEED, ROBOT_BOUNTY, SPR_ROBOT_A, SPR_ROBOT_B },
+};
 
 static enemy_t s_enemies[MAX_ENEMIES];
 
@@ -31,21 +45,31 @@ void enemies_init(void) {
     for (i = 0; i < MAX_ENEMIES; i++) {
         s_enemies[i].alive = 0;
         s_enemies[i].gen = 0;
+        s_enemies[i].type = ENEMY_BUG;
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
     }
 }
 
-bool enemies_spawn(void) {
+void enemies_hide_all(void) {
     u8 i;
+    for (i = 0; i < MAX_ENEMIES; i++) {
+        move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
+    }
+}
+
+bool enemies_spawn(u8 type) {
+    u8 i;
+    if (type >= ENEMY_TYPE_COUNT) return false;
     for (i = 0; i < MAX_ENEMIES; i++) {
         if (s_enemies[i].alive) continue;
         const waypoint_t *wp = map_waypoints();
         s_enemies[i].x = wp_x_fix(wp[0].tx);
         s_enemies[i].y = wp_y_fix(wp[0].ty);
-        s_enemies[i].hp = BUG_HP;
+        s_enemies[i].hp = s_enemy_stats[type].hp;
         s_enemies[i].wp_idx = 0;
         s_enemies[i].anim = 0;
         s_enemies[i].alive = 1;
+        s_enemies[i].type = type;
         s_enemies[i].gen++;   /* wraps at 255; collision is astronomical */
         return true;
     }
@@ -63,6 +87,7 @@ u8   enemies_x_px(u8 idx)     { return FIX8_INTU(s_enemies[idx].x); }
 u8   enemies_y_px(u8 idx)     { return FIX8_INTU(s_enemies[idx].y); }
 u8   enemies_wp_idx(u8 idx)   { return s_enemies[idx].wp_idx; }
 u8   enemies_gen(u8 idx)      { return s_enemies[idx].gen; }
+u8   enemies_bounty(u8 idx)   { return s_enemy_stats[s_enemies[idx].type].bounty; }
 
 bool enemies_apply_damage(u8 idx, u8 dmg) {
     if (!s_enemies[idx].alive) return false;
@@ -95,7 +120,7 @@ static void step_enemy(u8 i) {
     /* Path is axis-aligned; move along the dominant axis. */
     i16 ddx = tx - e->x;
     i16 ddy = ty - e->y;
-    fix8 step = BUG_SPEED;
+    fix8 step = s_enemy_stats[e->type].speed;
 
     if (ddx > 0) {
         if (ddx <= step) { e->x = tx; }
@@ -118,7 +143,8 @@ static void step_enemy(u8 i) {
     /* Animate every 16 frames. */
     e->anim++;
     u8 frame = (e->anim >> 4) & 1;
-    set_sprite_tile(OAM_ENEMIES_BASE + i, frame ? SPR_BUG_B : SPR_BUG_A);
+    set_sprite_tile(OAM_ENEMIES_BASE + i,
+        frame ? s_enemy_stats[e->type].spr_b : s_enemy_stats[e->type].spr_a);
     /* GB sprite origin: pixel center -> -4 to align top-left of 8x8 tile. */
     u8 sx = FIX8_INTU(e->x) - 4 + 8;
     u8 sy = FIX8_INTU(e->y) - 4 + 16;

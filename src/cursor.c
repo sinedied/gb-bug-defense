@@ -7,11 +7,15 @@
 
 static u8  s_tx, s_ty;          /* play-field-local */
 static u8  s_blink;             /* frame counter */
+static bool s_blink_paused;     /* iter-2: menu freezes blink */
+
+void cursor_blink_pause(bool paused) { s_blink_paused = paused; }
 
 void cursor_init(void) {
     s_tx = 1;
     s_ty = 0;
     s_blink = 0;
+    s_blink_paused = false;
     move_sprite(OAM_CURSOR, 0, 0); /* hidden until first update */
 }
 
@@ -39,8 +43,11 @@ void cursor_update(void) {
     s_blink++;
 
     bool valid = cursor_on_valid_tile();
-    /* Valid: 1 Hz blink (period 60). Invalid: 2 Hz (period 30). */
-    u8 phase = valid ? ((s_blink / 30) & 1) : ((s_blink / 15) & 1);
+    /* Valid: 1 Hz blink (period 60). Invalid: 2 Hz (period 30).
+     * When the menu has paused blink, hold the steady on-phase. */
+    u8 phase;
+    if (s_blink_paused) phase = 0;
+    else phase = valid ? ((s_blink / 30) & 1) : ((s_blink / 15) & 1);
 
     u8 tile;
     if (valid) tile = phase ? SPR_CURSOR_B : SPR_CURSOR_A;

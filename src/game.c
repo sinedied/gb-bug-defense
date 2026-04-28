@@ -11,11 +11,16 @@
 #include "projectiles.h"
 #include "waves.h"
 #include "economy.h"
+#include "audio.h"
+#include "menu.h"
 #include <gb/gb.h>
 
 enum { GS_TITLE, GS_PLAYING, GS_WIN, GS_LOSE };
 
 static u8 s_state;
+static u8 s_selected_type;     /* iter-2: TOWER_AV | TOWER_FW */
+
+u8 game_get_selected_tower_type(void) { return s_selected_type; }
 
 static void enter_title(void) {
     /* Hide every game-state sprite slot before redrawing the title. */
@@ -23,6 +28,7 @@ static void enter_title(void) {
     towers_init();
     enemies_init();
     projectiles_init();
+    menu_init();
     title_enter();
     s_state = GS_TITLE;
 }
@@ -34,18 +40,29 @@ static void enter_playing(void) {
     gfx_hide_all_sprites();
     map_load();
     /* Init game state first so HUD reads correct values on its first draw. */
+    s_selected_type = TOWER_AV;
     economy_init();
     waves_init();
-    hud_init();
     cursor_init();
     towers_init();
     enemies_init();
     projectiles_init();
+    menu_init();
+    hud_init();
+    /* Clear any stale audio state from the previous session — otherwise the
+     * win/lose jingle on ch1 (priority 3) leaks across sessions and blocks
+     * every subsequent ch1 SFX (e.g. tower-place) for the rest of the run. */
+    audio_reset();
     DISPLAY_ON;
     s_state = GS_PLAYING;
 }
 
 static void enter_gameover(bool win) {
+    /* Play the win/lose stinger BEFORE gameover_enter() — that call does
+     * DISPLAY_OFF + a 360-tile redraw which blocks the main loop for several
+     * frames. Triggering the SFX first lets the channel sequencer hold the
+     * first note while audio_tick is paused. (Iter-2 spec §8 F9.) */
+    audio_play(win ? SFX_WIN : SFX_LOSE);
     gameover_enter(win);
     s_state = win ? GS_WIN : GS_LOSE;
 }
@@ -54,15 +71,40 @@ void game_init(void) {
     enter_title();
 }
 
+static void cycle_tower_type(void) {
+    s_selected_type ^= 1;
+    hud_mark_t_dirty();
+}
+
 static void playing_update(void) {
-    cursor_update();
-    if (input_is_pressed(J_A)) {
-        towers_try_place(cursor_tx(), cursor_ty());
+    if (menu_is_open()) {
+        menu_update();
+    } else {
+        cursor_update();
+        if (input_is_pressed(J_B)) {
+            cycle_tower_type();
+        }
+        if (input_is_pressed(J_A)) {
+            i8 idx = towers_index_at(cursor_tx(), cursor_ty());
+            if (idx >= 0) {
+                menu_open((u8)idx);
+                /* Early return so the just-opened menu freezes gameplay
+                 * for THIS frame too — otherwise enemies/projectiles/waves
+                 * would tick once and re-emit OAM after menu_open hid them.
+                 * Audio + economy still tick. */
+                economy_tick();
+                audio_tick();
+                return;
+            }
+            towers_try_place(cursor_tx(), cursor_ty(), s_selected_type);
+        }
+        towers_update();
+        enemies_update();
+        projectiles_update();
+        waves_update();
     }
-    towers_update();
-    enemies_update();
-    projectiles_update();
-    waves_update();
+    economy_tick();   /* runs even with menu open — D19 */
+    audio_tick();     /* runs always so SFX continue during menu */
 
     if (economy_get_hp() == 0) {
         enter_gameover(false);
@@ -75,17 +117,18 @@ static void playing_update(void) {
 
 static void playing_render(void) {
     /* All gameplay BG writes (HUD digits, computer-damaged swap, newly-
-     * placed tower tiles) must land in the VBlank window. Worst case ~14
-     * tile writes; comfortably fits in ~1080 cycles. */
+     * placed tower tiles) must land in the VBlank window. */
     hud_update();
     map_render();
     towers_render();
+    menu_render();    /* sprite OAM only — no BG writes */
 }
 
 void game_update(void) {
     switch (s_state) {
     case GS_TITLE:
         title_update();
+        audio_tick();   /* drain any in-flight win/lose jingle while idle */
         if (input_is_pressed(J_START)) enter_playing();
         break;
     case GS_PLAYING:
@@ -94,6 +137,7 @@ void game_update(void) {
     case GS_WIN:
     case GS_LOSE:
         gameover_update();
+        audio_tick();   /* keep the win/lose stinger advancing */
         if (input_is_pressed(J_START)) enter_title();
         break;
     }

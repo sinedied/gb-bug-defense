@@ -36,15 +36,28 @@ Other recipes:
 ## Controls
 
 - **D-pad** — move placement cursor (12-frame initial / 6-frame repeat)
-- **A** — place tower (10 energy)
+- **A** — place selected tower (or open upgrade/sell menu on an existing tower)
+- **B** — cycle selected tower type (Antivirus ↔ Firewall)
 - **Start** — begin game / return to title from game over
+
+In the upgrade/sell menu: **D-pad up/down** picks Upgrade or Sell,
+**A** confirms, **B** cancels. Gameplay freezes while the menu is open.
 
 ## How it plays
 
-You start with 5 HP and 30 energy. Each tower costs 10 and shoots once per
-second at the bug closest to your computer. Killing a bug awards 3 energy.
-Survive 3 escalating waves (5, 8, then 12 bugs) without letting your HP hit
-zero. Win → "SYSTEM CLEAN :)". Lose → "KERNEL PANIC X_X".
+You start with 5 HP and 30 energy, plus a slow passive trickle of
++1 energy every 3 s. Two tower types defend your computer:
+
+- **Antivirus** (`A`, 10 E, 3-tile range): fast, low-damage chip-shots.
+- **Firewall** (`F`, 15 E, 5-tile range): slow but heavy hitter — the
+  answer to robots.
+
+Each tower can be upgraded once (faster + harder hits) or sold for
+half of what you've sunk into it. Killing a bug awards 3 energy; a
+robot awards 5. Survive 10 escalating waves (mix of bugs and robots,
+final wave is a 28-enemy "boss" mix) without letting HP hit zero.
+Win → "SYSTEM CLEAN :)". Lose → "KERNEL PANIC X_X". Sound effects
+play on channels 1, 2 and 4 throughout.
 
 ## Project layout
 

@@ -1,6 +1,7 @@
 #include "projectiles.h"
 #include "enemies.h"
 #include "economy.h"
+#include "audio.h"
 #include "assets.h"
 #include <gb/gb.h>
 
@@ -9,6 +10,7 @@ typedef struct {
     u8 target;
     u8 target_gen;   /* enemies_gen() at fire time; mismatch = slot reused */
     u8 alive;
+    u8 damage;       /* iter-2: per-tower damage stat */
 } proj_t;
 
 static proj_t s_proj[MAX_PROJECTILES];
@@ -21,7 +23,14 @@ void projectiles_init(void) {
     }
 }
 
-bool projectiles_fire(fix8 x, fix8 y, u8 target_idx) {
+void projectiles_hide_all(void) {
+    u8 i;
+    for (i = 0; i < MAX_PROJECTILES; i++) {
+        move_sprite(OAM_PROJ_BASE + i, 0, 0);
+    }
+}
+
+bool projectiles_fire(fix8 x, fix8 y, u8 target_idx, u8 damage) {
     u8 i;
     for (i = 0; i < MAX_PROJECTILES; i++) {
         if (!s_proj[i].alive) {
@@ -29,7 +38,9 @@ bool projectiles_fire(fix8 x, fix8 y, u8 target_idx) {
             s_proj[i].y = y;
             s_proj[i].target = target_idx;
             s_proj[i].target_gen = enemies_gen(target_idx);
+            s_proj[i].damage = damage;
             s_proj[i].alive = 1;
+            audio_play(SFX_TOWER_FIRE);
             return true;
         }
     }
@@ -38,8 +49,8 @@ bool projectiles_fire(fix8 x, fix8 y, u8 target_idx) {
 
 static void step_proj(u8 i) {
     proj_t *p = &s_proj[i];
-    /* Despawn if target is dead OR the slot was reused by a different bug
-     * (gen mismatch). Otherwise an in-flight shot would silently retarget. */
+    /* Despawn if target is dead OR the slot was reused by a different enemy
+     * (gen mismatch). */
     if (!enemies_alive(p->target) || enemies_gen(p->target) != p->target_gen) {
         p->alive = 0;
         move_sprite(OAM_PROJ_BASE + i, 0, 0);
@@ -50,8 +61,7 @@ static void step_proj(u8 i) {
     i16 ddx = tx - p->x;
     i16 ddy = ty - p->y;
 
-    /* Hit check (squared pixel distance). Unsigned to avoid i16 overflow:
-     * worst-case 160² + 144² = 46336 > 32767. */
+    /* Hit check (squared pixel distance, unsigned). */
     i16 px = (i16)FIX8_INTU(p->x);
     i16 py = (i16)FIX8_INTU(p->y);
     i16 ex = (i16)enemies_x_px(p->target);
@@ -62,8 +72,18 @@ static void step_proj(u8 i) {
     u16 adyp = dyp < 0 ? (u16)-dyp : (u16)dyp;
     u16 d2 = adxp * adxp + adyp * adyp;
     if (d2 <= (u16)PROJ_HIT_SQ) {
-        bool killed = enemies_apply_damage(p->target, PROJ_DAMAGE);
-        if (killed) economy_award(KILL_BOUNTY);
+        /* Capture bounty BEFORE the damage call: enemies_apply_damage may
+         * free the slot, and a same-frame enemies_spawn could reassign it
+         * to a different type whose bounty would otherwise be wrongly
+         * credited. (See specs/iter2.md §3 F5.) */
+        u8 bounty = enemies_bounty(p->target);
+        bool killed = enemies_apply_damage(p->target, p->damage);
+        if (killed) {
+            economy_award(bounty);
+            audio_play(SFX_ENEMY_DEATH);
+        } else {
+            audio_play(SFX_ENEMY_HIT);
+        }
         p->alive = 0;
         move_sprite(OAM_PROJ_BASE + i, 0, 0);
         return;
@@ -71,7 +91,6 @@ static void step_proj(u8 i) {
 
     /* Move toward target along dominant axis (cheap & correct enough). */
     fix8 step = PROJ_SPEED;
-    /* Decompose into both axes so projectiles can travel diagonals.       */
     i16 abx = ddx < 0 ? -ddx : ddx;
     i16 aby = ddy < 0 ? -ddy : ddy;
     if (abx >= aby) {

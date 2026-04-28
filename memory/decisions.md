@@ -87,3 +87,71 @@
  game_update()`. Each module is split into `_update()` (logic + sprite shadow-OAM, safe outside VBlank) and `_render()` (small VBlank-safe BG writes). Full-screen BG redraws (`title_enter`, `gameover_enter`, `enter_playing`+`map_load`) bracket their writes with `DISPLAY_ `DISPLAY_ON`.OFF` 
 - **Rationale**: Cleaner than a single-phase design. Worst-case render BG-write count is ~14 tiles (HUD digits + computer 4-tile swap + 1 newly-placed tower) which fits comfortably in the ~1080-cycle DMG VBlank window. The display-off blank frame on state transitions is acceptable.
 - **Alternatives**: Keep single-phase but move `wait_vbl_done()` to the top (would still require the `_update`/`_render` split for any BG write that depends on logic-derived state); use the LCD STAT interrupt to schedule writes (overkill for MVP).
+
+### Iter-2: Firewall tower = single-target, slow, high-damage, longer range
+- **Date**: 2025-01-30
+- **Context**: Iter-2 spec (`specs/iter2.md`) needed a meaningful counterpart to the MVP "antivirus" tower without expanding `projectiles.c` for AoE.
+- **Decision**: Firewall is single-target, cooldown 120 f (L0) / 90 f (L1), damage 3 (L0) / 4 (L1), range 40 px (5 tiles), cost 15. Antivirus stays single-target, cooldown 60 f / 40 f, damage 1 / 2, range 24 px, cost 10. One upgrade level only.
+- **Rationale**: AoE requires a multi-target damage loop and an area-flash sprite (both expand `projectiles.c` non-trivially). High-damage single-shot at long range fills the strategic role of "anti-robot sniper" and keeps `projectiles.c` change to a one-parameter API extension (`damage` arg).
+- **Alternatives**: AoE firewall (rejected — scope), chain lightning (out of scope), slow-effect debuff (requires per-enemy slow-state).
+
+### Iter-2: B button cycles tower type; A on existing tower opens upgrade/sell menu
+- **Date**: 2025-01-30
+- **Context**: Two tower types need a selection mechanism; existing towers need an upgrade/sell entry point.
+- **Decision**: B (no-op in MVP, "reserved for future menu" per `mvp-design.md §5`) edge-toggles `s_selected_type` between AV and FW; HUD col 19 reflects choice. A on a tile occupied by a tower opens the upgrade/sell menu (`towers_index_at(tx,ty) >= 0`); A on empty buildable tile places the currently-selected tower.
+- **Rationale**: Zero-friction cycle for 2 types; reuses an MVP-reserved button; A's overload is unambiguous because tower presence is mutually exclusive with placement validity.
+- **Alternatives**: SELECT (less discoverable), START opens dedicated panel (overkill for 2 types).
+
+### Iter-2: Upgrade/sell menu = sprite overlay with entity freeze
+- **Date**: 2025-01-30
+- **Context**: Need an in-game menu without DISPLAY_OFF blink and without exceeding per-scanline sprite limits.
+- **Decision**: 14 sprites in OAM 1..14 (formerly tower-reserved per F3). On `menu_open`: enemies + projectiles + waves are gated and their OAM hidden (`enemies_hide_all`, `projectiles_hide_all`). Modal — auto-resumes on `menu_close`. `playing_update` early-returns the frame menu opens.
+- **Rationale**: Avoids BG redraw blink; uses already-reserved OAM range; freezing eliminates per-scanline math worry. Distinct from the iter-3 "pause menu" (no Start binding).
+- **Alternatives**: BG-with-tile-restore (write-budget tight + race risk); DISPLAY_OFF (visible blink); HUD-mode reuse (loses HP/E/W readout).
+
+### Iter-2: Wave script = const event lists per wave; 10 waves, 50-frame spawn floor; MAX_ENEMIES=14
+- **Date**: 2025-01-30
+- **Context**: Mixed bug+robot composition needs interleaving without runtime parser; pool size constrains spawn cadence.
+- **Decision**: Each wave is `const spawn_event_t events[]` of `(type, delay)` pairs; 10 waves; `MAX_ENEMIES` bumped 12 → 14; `OAM_PROJ_BASE` shifted 29 → 31; spawn-interval floor of 50 frames in W8/W9/W10 to fit pool given 480-frame bug path traversal.
+- **Rationale**: Const data, no parser, ~324 B ROM. Pool/spawn math: 480/50 ≈ 10 alive worst case; 14 leaves margin. Boss-feel finale via total count (28), not cadence.
+- **Alternatives**: External data file (no payoff at iter-2 scale); 35-f cadence (overflows even bumped pool).
+
+### Iter-2: SFX engine = hand-coded `audio.c`, channels 1/2/4 only, per-channel priority preempt
+- **Date**: 2025-01-30
+- **Context**: 6 SFX needed; ch3 (wave) reserved for iter-3 music.
+- **Decision**: Hand-rolled `audio.c` with `const sfx_def_t S_SFX[]` containing `nrx1` (duty/length), `envelope` (NRx2), `sweep` (NR10 ch1), `pitches[]`, priority. Stop sequence writes `NRx2 = 0x08` (DAC off) — NOT `NRx4 = 0`. Start sequence: NRx1 → NRx2 → NRx3 → NRx4|0x80 (trigger). New `priority >= cur` preempts on the same channel.
+- **Rationale**: hUGE/GBT-Player pull a tracker runtime + bank infra better suited for iter-3 music. ~720 B for 6 SFX is acceptable.
+- **Alternatives**: hUGEDriver (deferred to iter-3 with music); GBT-Player (same).
+
+### Iter-2: Stay on 32 KB no-MBC
+- **Date**: 2025-01-30
+- **Context**: Iter-2 adds ~2.4 KB; budget §11 in `specs/iter2.md` shows worst-case ~21 KB.
+- **Decision**: No MBC1 in iter-2. Defer to iter-3 when music + extra maps land.
+- **Rationale**: 11 KB headroom. Roadmap explicitly defers banking until forced.
+- **Alternatives**: Pre-emptive MBC1 (unnecessary complexity).
+
+### Iter-2 review F1: `audio_reset()` API + reset on session entry
+- **Date**: 2025-01-31
+ ch1 priority sticks at 3 forever, blocking every subsequent ch1 SFX (`SFX_TOWER_PLACE`, future win/lose) for the rest of the session.
+- **Decision**: Add `audio_reset()` to `audio.c` (zeroes per-channel state struct + calls `silence_channel()` for ch1/2/4; does NOT touch NR50/51/52 master regs so it's safe to call repeatedly). `enter_playing()` calls it after every other module init. Title state also calls `audio_tick()` so the jingle drains naturally if the player sits at the title.
+- **Rationale**: Surgical, reusable for future state transitions. Matches the existing per-module `_init()` reset pattern.
+- **Alternatives**: Reuse `audio_init()` (writes NR52  overkill, possible double-init issues); only drain via title's `audio_tick()` (doesn't help when player skips the jingle entirely by mashing START).master 
+
+### Iter-2 review F2: `silence_channel()` writes NRx2 = 0x00 (DAC truly off)
+- **Date**: 2025-01-31
+ DAC stays enabled, NR52 channel-on flag never clears, DC offset on real hardware.
+- **Decision**: Write `NRx2 = 0x00` in `silence_channel()`. Re-arm path (`start_note()`) already writes a non-zero envelope and triggers via NRx4 bit 7, so the next `audio_play()` is unaffected.
+- **Rationale**: Matches pandocs DAC behaviour; eliminates DC offset; makes NR52 flag accurate for any future audio debugging.
+
+### Iter-2 review F3: Force cursor to steady on-phase tile when menu opens
+- **Date**: 2025-01-31
+ invisible cursor for the entire menu session.
+- **Decision**: After `cursor_blink_pause(true)`, `menu_open()` directly writes `set_sprite_tile(OAM_CURSOR, SPR_CURSOR_A)` (the steady valid-on-phase tile). No new API  the `cursor_blink_pause` flag is preserved for when `cursor_update` re-runs after `menu_close()`.surface 
+- **Rationale**: Smaller surface than a dedicated `cursor_force_steady()` API for a one-line fix.
+
+### Iter-2 review F4: Extract pure-data tuning constants into `src/tuning.h`
+- **Date**: 2025-01-31
+- **Context**: `tests/test_math.c` redefined `PASSIVE_INCOME_PERIOD`, tower stats, enemy bounties, `MAX_TOWERS` etc.  tautological mirrors. If gameplay values drifted, tests still passed.locally 
+- **Decision**: New header `src/tuning.h` contains ONLY pure-data constants (no `<gb/gb.h>`, no GBDK types). `gtypes.h` `#include "tuning.h"`; gameplay code keeps using the constants by the same names. `tests/test_math.c` `#include "tuning.h"` directly (justfile passes `-Isrc`). New `TOWER_*_COOLDOWN(_L1)` and `TOWER_*_DAMAGE(_L1)` macros replace the magic numbers in `towers.c`'s stats table so the test now anchors them. Bounties are pulled via `BUG_BOUNTY` / `ROBOT_BOUNTY`.
+- **Rationale**: Eliminates constant drift at the type-checker level; minimal blast radius (one new file, gtypes.h slimmed, towers.c stats table de-magic-numbered).
+- **Alternatives**: Compile gameplay `.c` files directly into the host test binary (would pull in `<gb/gb.h>`  too invasive); keep mirrors with a comment ( reviewers asked for real coverage).rejected shims 

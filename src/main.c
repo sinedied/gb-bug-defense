@@ -1,6 +1,7 @@
 #include "gtypes.h"
 #include "gfx.h"
 #include "input.h"
+#include "audio.h"
 #include "game.h"
 #include <gb/gb.h>
 
@@ -8,6 +9,7 @@ void main(void) {
     DISPLAY_OFF;
     gfx_init();
     gfx_hide_all_sprites();
+    audio_init();
     input_init();
     game_init();
 

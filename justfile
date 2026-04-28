@@ -76,7 +76,7 @@ test:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "{{BUILD}}"
-    cc -std=c99 -Wall -Wextra -O2 tests/test_math.c -o "{{BUILD}}/test_math"
+    cc -std=c99 -Wall -Wextra -O2 -Isrc tests/test_math.c -o "{{BUILD}}/test_math"
     "{{BUILD}}/test_math"
 
 # Build + launch emulator (one-command playtest)

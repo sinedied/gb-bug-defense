@@ -5,6 +5,7 @@
 
 void cursor_init(void);
 void cursor_update(void);
+void cursor_blink_pause(bool paused);   /* iter-2: hold steady highlight */
 
 u8   cursor_tx(void);  /* play-field-local tile col */
 u8   cursor_ty(void);  /* play-field-local tile row */

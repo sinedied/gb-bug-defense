@@ -2,15 +2,25 @@
 #include "hud.h"
 #include "map.h"
 
-static u8 s_hp;
-static u8 s_energy;
+static u8  s_hp;
+static u8  s_energy;
+static u16 s_passive_timer;       /* iter-2 */
 
 void economy_init(void) {
     s_hp = START_HP;
     s_energy = START_ENERGY;
+    s_passive_timer = 0;
     map_set_computer_damaged(false);
     hud_mark_hp_dirty();
     hud_mark_e_dirty();
+}
+
+void economy_tick(void) {
+    s_passive_timer++;
+    if (s_passive_timer >= PASSIVE_INCOME_PERIOD) {
+        s_passive_timer = 0;
+        economy_award(1);
+    }
 }
 
 u8 economy_get_hp(void)     { return s_hp; }

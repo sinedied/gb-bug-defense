@@ -322,6 +322,33 @@ def tower_bg_tile():
 
 TOWER_BG = tower_bg_tile()
 
+# Iter-2: Firewall tower BG tile (TILE_TOWER_2). Brick wall pattern with
+# a single light-grey "ember" pixel hinting at the fire theme.
+def tower2_bg_tile():
+    art = [
+        ".######.",
+        "#+##+##+",
+        "########",
+        "+##%##++",
+        "########",
+        "#+##+##+",
+        "########",
+        ".######.",
+    ]
+    rows = []
+    for line in art:
+        r = []
+        for ch in line:
+            if   ch == '.': r.append(W)
+            elif ch == '%': r.append(L)
+            elif ch == '+': r.append(D)
+            elif ch == '#': r.append(B)
+            else: raise ValueError(ch)
+        rows.append(r)
+    return encode(rows)
+
+TOWER2_BG = tower2_bg_tile()
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -334,6 +361,7 @@ map_tiles = [
     ('TILE_COMP_BL_D', COMP_BL_D),
     ('TILE_COMP_BR_D', COMP_BR_D),
     ('TILE_TOWER',    TOWER_BG),
+    ('TILE_TOWER_2',  TOWER2_BG),
 ]
 
 # ----------------------------------------------------------------------------
@@ -441,6 +469,65 @@ SPR_PROJ = sprite_from_art([
     "........",
 ])
 
+# Iter-2: Robot agent — vertical humanoid silhouette, distinct from the
+# horizontal centipede SPR_BUG_*. Two walk frames differ only in row 7
+# (legs apart vs. feet together).
+SPR_ROBOT_A = sprite_from_art([
+    "....#...",
+    "..####..",
+    "..#..#..",
+    "..####..",
+    ".######.",
+    ".#++++#.",
+    ".#++++#.",
+    ".##..##.",
+])
+SPR_ROBOT_B = sprite_from_art([
+    "....#...",
+    "..####..",
+    "..#..#..",
+    "..####..",
+    ".######.",
+    ".#++++#.",
+    ".#++++#.",
+    "...##...",
+])
+
+# Iter-2: Sprite-bank glyph mirror of FONT entries used by the upgrade/sell
+# menu. Pixel-identical with the BG HUD font (same FONT dict, same insets).
+def glyph_to_sprite(ch):
+    return glyph_to_tile(FONT[ch])
+
+SPR_GLYPH_U     = glyph_to_sprite('U')
+SPR_GLYPH_P     = glyph_to_sprite('P')
+SPR_GLYPH_G     = glyph_to_sprite('G')
+SPR_GLYPH_S     = glyph_to_sprite('S')
+SPR_GLYPH_E     = glyph_to_sprite('E')
+SPR_GLYPH_L     = glyph_to_sprite('L')
+SPR_GLYPH_COLON = glyph_to_sprite(':')
+# '>' isn't in FONT; create a small chevron glyph that matches the 5x7 style.
+FONT['>'] = [
+    ".#...",
+    "..#..",
+    "...#.",
+    "....#",
+    "...#.",
+    "..#..",
+    ".#...",
+]
+SPR_GLYPH_GT    = glyph_to_sprite('>')
+SPR_GLYPH_DASH  = glyph_to_sprite('-')
+SPR_GLYPH_0     = glyph_to_sprite('0')
+SPR_GLYPH_1     = glyph_to_sprite('1')
+SPR_GLYPH_2     = glyph_to_sprite('2')
+SPR_GLYPH_3     = glyph_to_sprite('3')
+SPR_GLYPH_4     = glyph_to_sprite('4')
+SPR_GLYPH_5     = glyph_to_sprite('5')
+SPR_GLYPH_6     = glyph_to_sprite('6')
+SPR_GLYPH_7     = glyph_to_sprite('7')
+SPR_GLYPH_8     = glyph_to_sprite('8')
+SPR_GLYPH_9     = glyph_to_sprite('9')
+
 sprite_tiles = [
     ('SPR_CURSOR_A',    SPR_CURSOR_A),
     ('SPR_CURSOR_B',    SPR_CURSOR_B),
@@ -450,6 +537,27 @@ sprite_tiles = [
     ('SPR_BUG_A',       SPR_BUG_A),
     ('SPR_BUG_B',       SPR_BUG_B),
     ('SPR_PROJ',        SPR_PROJ),
+    ('SPR_ROBOT_A',     SPR_ROBOT_A),
+    ('SPR_ROBOT_B',     SPR_ROBOT_B),
+    ('SPR_GLYPH_U',     SPR_GLYPH_U),
+    ('SPR_GLYPH_P',     SPR_GLYPH_P),
+    ('SPR_GLYPH_G',     SPR_GLYPH_G),
+    ('SPR_GLYPH_S',     SPR_GLYPH_S),
+    ('SPR_GLYPH_E',     SPR_GLYPH_E),
+    ('SPR_GLYPH_L',     SPR_GLYPH_L),
+    ('SPR_GLYPH_COLON', SPR_GLYPH_COLON),
+    ('SPR_GLYPH_GT',    SPR_GLYPH_GT),
+    ('SPR_GLYPH_DASH',  SPR_GLYPH_DASH),
+    ('SPR_GLYPH_0',     SPR_GLYPH_0),
+    ('SPR_GLYPH_1',     SPR_GLYPH_1),
+    ('SPR_GLYPH_2',     SPR_GLYPH_2),
+    ('SPR_GLYPH_3',     SPR_GLYPH_3),
+    ('SPR_GLYPH_4',     SPR_GLYPH_4),
+    ('SPR_GLYPH_5',     SPR_GLYPH_5),
+    ('SPR_GLYPH_6',     SPR_GLYPH_6),
+    ('SPR_GLYPH_7',     SPR_GLYPH_7),
+    ('SPR_GLYPH_8',     SPR_GLYPH_8),
+    ('SPR_GLYPH_9',     SPR_GLYPH_9),
 ]
 
 # ----------------------------------------------------------------------------
@@ -605,7 +713,8 @@ assets_h = """\
 #define TILE_COMP_BL_D  (MAP_TILE_BASE + 8)
 #define TILE_COMP_BR_D  (MAP_TILE_BASE + 9)
 #define TILE_TOWER      (MAP_TILE_BASE + 10)
-#define MAP_TILE_COUNT  11
+#define TILE_TOWER_2    (MAP_TILE_BASE + 11)
+#define MAP_TILE_COUNT  12
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1
@@ -615,7 +724,28 @@ assets_h = """\
 #define SPR_BUG_A       5
 #define SPR_BUG_B       6
 #define SPR_PROJ        7
-#define SPRITE_TILE_COUNT 8
+#define SPR_ROBOT_A     8
+#define SPR_ROBOT_B     9
+#define SPR_GLYPH_U     10
+#define SPR_GLYPH_P     11
+#define SPR_GLYPH_G     12
+#define SPR_GLYPH_S     13
+#define SPR_GLYPH_E     14
+#define SPR_GLYPH_L     15
+#define SPR_GLYPH_COLON 16
+#define SPR_GLYPH_GT    17
+#define SPR_GLYPH_DASH  18
+#define SPR_GLYPH_0     19
+#define SPR_GLYPH_1     20
+#define SPR_GLYPH_2     21
+#define SPR_GLYPH_3     22
+#define SPR_GLYPH_4     23
+#define SPR_GLYPH_5     24
+#define SPR_GLYPH_6     25
+#define SPR_GLYPH_7     26
+#define SPR_GLYPH_8     27
+#define SPR_GLYPH_9     28
+#define SPRITE_TILE_COUNT 29
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

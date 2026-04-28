@@ -55,3 +55,14 @@ VBlank-safe `set_bkg_*` calls. `_update()` does logic + sprite shadow-
 
  game_update()` so render lands inside the VBlank window.
 Full-screen BG redraws bracket their writes with `DISPLAY_OFF`/`ON`.
+
+### Iter-2 conventions (2025-01-30)
+- **HUD col 19** is reserved for the selected-tower indicator (`A` = antivirus, `F` = firewall). `hud_mark_t_dirty()` triggers the redraw.
+- **HUD wave field** widened to `W:NN/NN` (cols 11..17). Coders adding more waves past 99 must reflow.
+- **OAM 1..14** are owned by `menu.c` while `menu_is_open()`. `menu_close()` MUST hide them. `menu_open()` MUST hide enemies (17..30) + projectiles (31..38) via `enemies_hide_all()` / `projectiles_hide_all()`.
+- **OAM allocation (iter-2)**: 0 cursor / 1..14 menu / 15..16 reserved / 17..30 enemies (14) / 31..38 projectiles (8) / 39 reserved. Max 23 simultaneous (non-menu) or 15 (menu).
+- **Per-frame BG-write budget**: ≤ 16 (worst case 15 = HUD 10 + computer-damaged 4 + tower place-or-clear 1). `towers_render` performs at most 1 place AND at most 1 sell-clear per frame.
+- **Menu mode is modal**: `game.c::playing_update` returns early on the frame `menu_open()` is called, then on subsequent frames gates `cursor_update`, `towers_update`, `enemies_update`, `projectiles_update`, `waves_update`. Only `economy_tick` and `audio_tick` run during menu mode.
+- **Sprite-bank glyph reuse**: any FONT-dict glyph in `gen_assets.py` may be mirrored into the sprite VRAM bank via `glyph_to_sprite(ch)`. Pixel-identical with HUD digits.
+- **Bounty capture rule**: any code calling `enemies_apply_damage` MUST capture the bounty/type-derived state BEFORE the call, since the call may free the slot for same-frame re-use by `enemies_spawn`.
+- **Module init in state transitions**: `enter_playing()` calls every module's `_init()` including `menu_init()` (added in iter-2). The MVP's per-`_init` OAM-hide convention extends to menu's slot range.

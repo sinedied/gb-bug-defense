@@ -3,6 +3,7 @@
 
 #include <gb/gb.h>
 #include <stdint.h>
+#include "tuning.h"
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -24,16 +25,15 @@ typedef i16      fix8;          /* 8.8 fixed point */
 #define false 0
 #endif
 
-/* Pool sizes (authoritative — also in memory/conventions.md) */
-#define MAX_ENEMIES     12
-#define MAX_PROJECTILES  8
-#define MAX_TOWERS      16
+/* Pool sizes, economy, enemy/tower/projectile/wave tuning all live in
+ * tuning.h (host-compilable, shared with tests/test_math.c). */
 
-/* OAM slot allocation */
+/* OAM slot allocation (iter-2) */
 #define OAM_CURSOR        0
-#define OAM_TOWERS_BASE   1   /* 1..16 */
-#define OAM_ENEMIES_BASE 17   /* 17..28 */
-#define OAM_PROJ_BASE    29   /* 29..36 */
+#define OAM_MENU_BASE     1   /* 1..14 — menu glyphs (only when menu open) */
+#define OAM_MENU_COUNT   14
+#define OAM_ENEMIES_BASE 17   /* 17..30 (14 slots) */
+#define OAM_PROJ_BASE    31   /* 31..38 (8 slots) — was 29..36 in MVP */
 #define OAM_TOTAL        40
 
 /* Play field origin in screen tile coords. HUD on row 0. */
@@ -41,27 +41,8 @@ typedef i16      fix8;          /* 8.8 fixed point */
 #define PF_COLS         20
 #define PF_ROWS         17
 
-/* Tuning constants */
-#define START_HP         5
-#define START_ENERGY    30
-#define TOWER_COST      10
-#define KILL_BOUNTY      3
-#define MAX_ENERGY     255
-
-#define BUG_HP           3
-#define BUG_SPEED       0x0080  /* 0.5 px/frame */
-
-#define TOWER_RANGE_PX  24
-#define TOWER_RANGE_SQ  (TOWER_RANGE_PX * TOWER_RANGE_PX)
-#define TOWER_COOLDOWN  60
-#define TOWER_DAMAGE     1
-
-#define PROJ_SPEED      0x0200  /* 2 px/frame */
-#define PROJ_HIT_PX      4
-#define PROJ_HIT_SQ     (PROJ_HIT_PX * PROJ_HIT_PX)
-#define PROJ_DAMAGE      1
-
-#define INTER_WAVE_DELAY 180
-#define FIRST_GRACE       60
+/* Enemy / tower type enums (mirrored in enemies.c / towers.c stat tables). */
+enum { ENEMY_BUG = 0, ENEMY_ROBOT = 1, ENEMY_TYPE_COUNT };
+enum { TOWER_AV  = 0, TOWER_FW    = 1, TOWER_TYPE_COUNT };
 
 #endif
