@@ -78,6 +78,13 @@ void cursor_blink_pause(bool paused)  { (void)paused; s_blink_pause_calls++; }
 void enemies_hide_all(void)           { s_enemies_hide_calls++; }
 void projectiles_hide_all(void)       { s_proj_hide_calls++; }
 
+/* music_duck stub — pause.c calls music_duck(1) on open and music_duck(0)
+ * on close (D-MUS-4). The actual duck (NR50 write) is exercised in
+ * test_music; here we just record the calls so a future test could
+ * assert the open/close pairing if needed. */
+static int s_duck_calls;
+void music_duck(unsigned char on)      { (void)on; s_duck_calls++; }
+
 /* ---------------------------------------------------------------- */
 /* Test framework                                                    */
 /* ---------------------------------------------------------------- */

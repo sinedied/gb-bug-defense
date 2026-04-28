@@ -130,3 +130,35 @@ Predicates that decide modal precedence / cross-modal gating belong in a header-
   dirty region per frame (selector first, blink deferred). This caps
   title at 12 writes/frame (the  within the 16-write cap. Seeprompt) 
   decisions.md "Title VBlank: selector-first, blink-deferred".
+
+### Music engine conventions (Iter-3 #16, 2026-05-22)
+- Music lives in `src/music.{h,c}`; SFX in `src/audio.{h,c}`. `audio_tick()`
+  calls `music_tick()` once per frame at the END of the tick - single
+  audio entry point for the main loop.
+- Music owns CH3 (always) and CH4 (when not preempted by SFX). CH1/CH2
+  are SFX-exclusive. Music NEVER touches CH1/CH2.
+- Wave RAM (0xFF30-0xFF3F) is written ONCE in `music_init()` with the
+  DAC off (`NR30=0x00`), then DAC turned on per-row via the next
+  `music_play()`/`music_tick()`. Never write wave RAM while CH3 is
+  enabled.
+- Song format = linear `mus_row_t` array with `loop_idx` (0xFF =
+  stinger one-shot). Each row holds CH3 pitch (0=rest), CH4 noise
+  byte (0=rest), and frame duration. End-of-stinger -> `music_stop()`.
+- `music_play(id)` is idempotent for the active song; switching songs
+  resets `row_idx` to 0 AND synchronously arms row-0 NR3x/NR4x BEFORE
+  returning (so stingers play their first note even when the caller
+  blocks the main loop).
+- Pause ducking touches NR50 only (`0x77` <-> `0x33`). Affects all
+  channels - intentional (D-MUS-4). Upgrade/sell menu does NOT duck.
+- Include direction is one-way: `audio.c` may include `music.h`;
+  `music.c` MUST NOT include `audio.h`.
+- Pure-helper rule: row-advance arithmetic lives as `static inline
+  music_next_row()` in `src/music.h` (`<stdint.h>`-only). Joins the
+  `tuning.h` / `game_modal.h` / `*_anim.h` / `difficulty_calc.h` family
+  of host-testable headers. Test coverage in `tests/test_music.c`
+  (8 cases: synchronous-arm, row advance, loop wrap, stinger end,
+  idempotency, song switch, ch4 arbitration, duck).
+- Test-stub extension: `tests/stubs/gb/hardware.h` exposes NR30-NR34
+  via the same `_NR_LOG` macro and `_AUD3WAVERAM` as a 16-byte global
+  array (`g_wave_ram`) so wave-RAM writes are observable from host
+  tests.

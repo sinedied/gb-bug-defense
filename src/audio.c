@@ -1,102 +1,78 @@
 #include "audio.h"
+#include "music.h"
 #include <gb/gb.h>
 #include <gb/hardware.h>
 
-/* SFX engine — see specs/iter2.md §8.
+/* SFX  see specs/iter2.8.md engine 
  *
  * Channels used: 1 (square + sweep), 2 (square), 4 (noise). Channel 3 (wave)
- * is reserved for iter-3 music.
+ * is owned by the music engine (src/music.c, D-MUS-2).
  *
- * DMG audio gotchas:
+ * Iter-3 #16 simplifications (D-MUS-3):
+ *   - SFX_WIN / SFX_LOSE removed (replaced by MUS_WIN / MUS_LOSE).
+ *   - All remaining SFX are single-note. The sfx_def_t multi-note fields
+ *     (note_count, frames_per_note, multi-element pitches) and the
+ *     audio_tick advance branch were deleted as dead code. Each SFX now
+ *     has exactly one pitch held for `duration` frames.
+ *
+ * Iter-3 #16 ch4 arbitration (D-MUS-2):
+ *   - audio_play(SFX_ENEMY_HIT|DEATH) calls music_notify_ch4_busy()
+ *     UNCONDITIONALLY (no-op when music  keeps audio leaf-free ofidle 
+ *     music state).
+ *   - audio_tick() edge-detects "ch4 SFX active at frame start, idle now"
+ *     and calls music_notify_ch4_free() BEFORE music_tick(). The notify
+ *     only sets a latch; music_tick clears ch4_blocked at the END of
+ *     the current tick (after the arm decision) and fires any deferred
+ *     arm at the TOP of the FOLLOWING tick. Net guarantee: ≥1 full
+ *     music_tick of percussion silence between SFX end and ch4 re-arm.
+ *
+ * DMG audio gotchas (unchanged):
  *  - NRx4 bit 7 is the trigger and is write-only: writing 0 to NRx4 does NOT
- *    silence a channel. To silence we write NRx2 = 0x00 (DAC truly off:
- *    DMG enables the DAC iff bits 7..3 of NRx2 are non-zero, so 0x00 also
- *    clears NR52's per-channel-active flag).
- *  - Re-enabling the DAC requires a subsequent NRx2 write with a non-zero
- *    top nibble AND a trigger (NRx4 bit 7). start_note() does both, so the
- *    next audio_play() after silence_channel() always re-arms cleanly.
- *  - NRx2 must have a non-zero top nibble before trigger or the DAC is off
- *    and the trigger is a no-op.
+ *    silence a channel. To silence we write NRx2 = 0x00 (DAC truly off).
+ *  - NRx2 must have a non-zero top nibble before trigger or DAC is off.
  *  - NR41 has no duty bits (noise channel); only the bottom 6 bits as length.
  */
 
 typedef struct {
-    u8        channel;        /* 1, 2, or 4 */
-    u8        priority;       /* higher preempts on same channel */
-    u8        nrx1;           /* duty + length (square: 0x80 = 50%; noise: 0x3F) */
-    u8        envelope;       /* NRx2 — top nibble must be non-zero */
-    u8        duration;       /* total frames (single-note path); 0 -> derived */
-    u8        is_noise;       /* 1 = ch4 (poly counter byte in pitches[i]) */
-    u8        sweep;          /* NR10 (ch1 only); 0 if unused */
-    u8        note_count;     /* >=1 */
-    u8        frames_per_note;
-    const u16 *pitches;       /* GB 11-bit freq for ch1/2; NR43 byte for ch4 */
+    u8  channel;        /* 1, 2, or 4 */
+    u8  priority;       /* higher preempts on same channel */
+    u8  nrx1;           /* duty + length (square: 0x80 = 50%; noise: 0x3F) */
+    u8  envelope;       /* NRx2: top nibble must be non-zero */
+    u8  duration;       /* total frames the single note is held */
+    u8  sweep;          /* NR10 (ch1 only); 0 if unused */
+    u16 pitch;          /* GB 11-bit freq for ch1/2; NR43 byte for ch4 */
 } sfx_def_t;
-
-static const u16 PITCH_LO[]    = { 0x06A4 };  /* short low blip */
-static const u16 PITCH_FIRE[]  = { 0x0783 };  /* mid square blip */
-static const u16 NOISE_HIT[]   = { 0x0050 };  /* short sharp click */
-static const u16 NOISE_DEATH[] = { 0x0070 };  /* longer rumble */
-static const u16 WIN_NOTES[]   = { 0x06A4, 0x0721, 0x0783, 0x07C2 };  /* asc */
-static const u16 LOSE_NOTES[]  = { 0x07C2, 0x0721, 0x06A4, 0x05F2 };  /* desc */
-static const u16 PITCH_BOOT[]  = { 0x0700 };  /* boot chime — mid square */
 
 static const sfx_def_t S_SFX[SFX_COUNT] = {
     [SFX_TOWER_PLACE] = {
-        /* No NR10 sweep: the previous value 0x16 (shift 6, period 1, down)
-         * dropped the 11-bit frequency by ~26 every 7.8 ms and disabled the
-         * channel by hardware within ~30 ms — the SFX was a near-inaudible
-         * pop. Fixed pitch keeps it as a clean ~265 ms beep (the volume
-         * envelope still decays the note out). */
+        /* No NR10 sweep: see iter-2 audio diag. Fixed pitch keeps it as a
+         * clean ~265 ms beep. */
         .channel = 1, .priority = 2, .nrx1 = 0x80, .envelope = 0xF1,
-        .duration = 16, .sweep = 0x00,
-        .note_count = 1, .frames_per_note = 16, .pitches = PITCH_LO,
+        .duration = 16, .sweep = 0x00, .pitch = 0x06A4,
     },
     [SFX_TOWER_FIRE] = {
         .channel = 2, .priority = 1, .nrx1 = 0x80, .envelope = 0xA1,
-        .duration = 4,
-        .note_count = 1, .frames_per_note = 4, .pitches = PITCH_FIRE,
+        .duration = 4, .pitch = 0x0783,
     },
     [SFX_ENEMY_HIT] = {
-        /* Bumped from 0xF1 vol 7 to vol 12 — the hit click was barely
-         * perceptible against the more prominent fire/death SFX. */
         .channel = 4, .priority = 1, .nrx1 = 0x3F, .envelope = 0xC1,
-        .duration = 3, .is_noise = 1,
-        .note_count = 1, .frames_per_note = 3, .pitches = NOISE_HIT,
+        .duration = 3, .pitch = 0x0050,
     },
     [SFX_ENEMY_DEATH] = {
         .channel = 4, .priority = 2, .nrx1 = 0x3F, .envelope = 0xC2,
-        .duration = 8, .is_noise = 1,
-        .note_count = 1, .frames_per_note = 8, .pitches = NOISE_DEATH,
-    },
-    [SFX_WIN] = {
-        .channel = 1, .priority = 3, .nrx1 = 0x80, .envelope = 0xF3,
-        .duration = 0,
-        .note_count = 4, .frames_per_note = 10, .pitches = WIN_NOTES,
-    },
-    [SFX_LOSE] = {
-        .channel = 1, .priority = 3, .nrx1 = 0x80, .envelope = 0xF3,
-        .duration = 0,
-        .note_count = 4, .frames_per_note = 10, .pitches = LOSE_NOTES,
+        .duration = 8, .pitch = 0x0070,
     },
     [SFX_BOOT] = {
-        /* Diagnostic chime fired from audio_init(). Channel 2 (not ch1) so
-         * it can't be preempted/blocked by a leaked ch1 priority and so the
-         * chime registers don't fight ch1 sweep state on the very first
-         * audio_play() of the run. Loud (vol 15, no envelope decay sweep)
-         * and short (~200 ms) — purely a "hello, audio works" tone. */
+        /* Diagnostic chime fired from audio_init(). See iter-2 audio diag. */
         .channel = 2, .priority = 1, .nrx1 = 0x80, .envelope = 0xF0,
-        .duration = 12,
-        .note_count = 1, .frames_per_note = 12, .pitches = PITCH_BOOT,
+        .duration = 12, .pitch = 0x0700,
     },
 };
 
 typedef struct {
     const sfx_def_t *cur;
     u8  prio;          /* 0 = idle */
-    u8  frames_left;   /* in current note */
-    u8  note_idx;
-    u8  notes_left;
+    u8  frames_left;
 } channel_state_t;
 
 /* Indexed 0..2 for channels 1, 2, 4 respectively. */
@@ -128,12 +104,7 @@ static void start_note(const sfx_def_t *def, u16 pitch) {
 }
 
 static void silence_channel(u8 channel) {
-    /* Write NRx2 = 0x00: bits 7..3 = 0 -> DAC off -> NR52 per-channel-active
-     * flag clears, no DC offset on real hardware. (Earlier 0x08 left bit 3
-     * set, which kept the DAC enabled per pandocs even though volume was
-     * zero — silent in practice but the channel-on flag stuck.) The
-     * subsequent audio_play() restores a non-zero envelope and triggers
-     * via NRx4 bit 7, so the channel re-arms cleanly. */
+    /* NRx2 = 0x00: DAC off (F2 fix). */
     if      (channel == 1) NR12_REG = 0x00;
     else if (channel == 2) NR22_REG = 0x00;
     else                   NR42_REG = 0x00;
@@ -143,29 +114,29 @@ void audio_init(void) {
     NR52_REG = 0x80;   /* sound master ON (must be set BEFORE other writes) */
     NR50_REG = 0x77;   /* both stereo terminals at max volume */
     NR51_REG = 0xFF;   /* all 4 channels routed to L+R */
-    audio_reset();
-    /* Boot chime — single audible note that confirms the APU is wired up
-     * and the host emulator's audio backend is unmuted. Without this, a
-     * silent emulator (Qt mGBA on macOS sometimes mutes by default) is
-     * indistinguishable from broken SFX code. The note advances via the
-     * normal audio_tick() in the main loop and silences itself after
-     * ~200 ms. */
+    audio_reset();     /* (now also calls music_reset, but ch3/4 silence is
+                        * already implied by power-on state, safe). */
+    /* Boot chime - see iter-2 audio diag. */
     audio_play(SFX_BOOT);
+    /* music_init AFTER NR52 is on AND AFTER the boot chime arms ch2.
+     * Wave RAM is loaded once here; the engine stays idle until the
+     * first music_play() call (from enter_title()). Order matters: if
+     * music_init ran before NR52, the wave-RAM writes would be dropped
+     * by the DMG quirk. */
+    music_init();
 }
 
 void audio_reset(void) {
-    /* Force every used channel back to a known-silent, idle state. Safe to
-     * call at any state transition; does NOT touch NR50/51/52 master regs
-     * so it is also safe to call repeatedly. */
+    /* Force every used SFX channel back to a known-silent, idle state. Also
+     * (D-MUS-5) reset music state. Safe to call at any state transition;
+     * does NOT touch NR50/51/52 master regs (so duck state survives). */
     silence_channel(1);
     silence_channel(2);
     silence_channel(4);
-    s_ch[0].cur = NULL; s_ch[0].prio = 0;
-    s_ch[0].frames_left = 0; s_ch[0].note_idx = 0; s_ch[0].notes_left = 0;
-    s_ch[1].cur = NULL; s_ch[1].prio = 0;
-    s_ch[1].frames_left = 0; s_ch[1].note_idx = 0; s_ch[1].notes_left = 0;
-    s_ch[2].cur = NULL; s_ch[2].prio = 0;
-    s_ch[2].frames_left = 0; s_ch[2].note_idx = 0; s_ch[2].notes_left = 0;
+    s_ch[0].cur = 0; s_ch[0].prio = 0; s_ch[0].frames_left = 0;
+    s_ch[1].cur = 0; s_ch[1].prio = 0; s_ch[1].frames_left = 0;
+    s_ch[2].cur = 0; s_ch[2].prio = 0; s_ch[2].frames_left = 0;
+    music_reset();
 }
 
 void audio_play(u8 sfx_id) {
@@ -177,30 +148,43 @@ void audio_play(u8 sfx_id) {
 
     s_ch[idx].cur         = def;
     s_ch[idx].prio        = def->priority;
-    s_ch[idx].note_idx    = 0;
-    s_ch[idx].notes_left  = def->note_count;
-    s_ch[idx].frames_left = def->frames_per_note;
-    start_note(def, def->pitches[0]);
+    s_ch[idx].frames_left = def->duration;
+    start_note(def, def->pitch);
+
+    /* Iter-3 #16 D-MUS-2: ch4 SFX preempts music's percussion row.
+     * Unconditional notify (no-op when music idle). The "is music ch4
+     * row armed" check lives in music.c so audio.c stays leaf-free of
+     * music state. */
+    if (def->channel == 4) {
+        music_notify_ch4_busy();
+    }
 }
 
 void audio_tick(void) {
+    /* Snapshot ch4 SFX activity at frame  needed for the "ch4start 
+     * SFX just ended this frame" edge detect (D-MUS-2 within-frame
+     * order step 2). */
+    u8 ch4_was_active = (s_ch[2].prio != 0);
+
     u8 i;
     for (i = 0; i < 3; i++) {
         if (s_ch[i].prio == 0) continue;
         if (s_ch[i].frames_left) s_ch[i].frames_left--;
         if (s_ch[i].frames_left == 0) {
             const sfx_def_t *def = s_ch[i].cur;
-            s_ch[i].note_idx++;
-            if (s_ch[i].note_idx >= s_ch[i].notes_left) {
-                /* End of SFX: stop this channel. */
-                silence_channel(def->channel);
-                s_ch[i].cur = NULL;
-                s_ch[i].prio = 0;
-            } else {
-                /* Advance to next note, re-trigger. */
-                s_ch[i].frames_left = def->frames_per_note;
-                start_note(def, def->pitches[s_ch[i].note_idx]);
-            }
+            silence_channel(def->channel);
+            s_ch[i].cur = 0;
+            s_ch[i].prio = 0;
         }
     }
+
+    /* Edge-detect ch4 SFX completion -> notify music it can re-arm at the
+     * next row boundary. */
+    if (ch4_was_active && s_ch[2].prio == 0) {
+        music_notify_ch4_free();
+    }
+
+    /* Single audio entry point: drive music last so any ch4 re-arm at a
+     * row boundary lands AFTER the SFX-end notify. */
+    music_tick();
 }

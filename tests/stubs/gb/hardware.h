@@ -16,6 +16,7 @@ extern unsigned char g_audio_regs[32];
 enum {
     REG_NR10 = 0, REG_NR11, REG_NR12, REG_NR13, REG_NR14,
     REG_NR21,     REG_NR22, REG_NR23, REG_NR24,
+    REG_NR30,     REG_NR31, REG_NR32, REG_NR33, REG_NR34,
     REG_NR41,     REG_NR42, REG_NR43, REG_NR44,
     REG_NR50,     REG_NR51, REG_NR52,
     REG__COUNT
@@ -49,6 +50,11 @@ extern unsigned int  g_write_log_len;
 #define NR22_REG _NR_LOG(REG_NR22)
 #define NR23_REG _NR_LOG(REG_NR23)
 #define NR24_REG _NR_LOG(REG_NR24)
+#define NR30_REG _NR_LOG(REG_NR30)
+#define NR31_REG _NR_LOG(REG_NR31)
+#define NR32_REG _NR_LOG(REG_NR32)
+#define NR33_REG _NR_LOG(REG_NR33)
+#define NR34_REG _NR_LOG(REG_NR34)
 #define NR41_REG _NR_LOG(REG_NR41)
 #define NR42_REG _NR_LOG(REG_NR42)
 #define NR43_REG _NR_LOG(REG_NR43)
@@ -56,5 +62,11 @@ extern unsigned int  g_write_log_len;
 #define NR50_REG _NR_LOG(REG_NR50)
 #define NR51_REG _NR_LOG(REG_NR51)
 #define NR52_REG _NR_LOG(REG_NR52)
+
+/* Wave RAM stub — 16 bytes at 0xFF30..0xFF3F on real hardware. The music
+ * engine writes WAVE0 here exactly once via _AUD3WAVERAM. Tests can read
+ * back to assert the write sequence (DAC-off via NR30 BEFORE wave bytes). */
+extern unsigned char g_wave_ram[16];
+#define _AUD3WAVERAM g_wave_ram
 
 #endif

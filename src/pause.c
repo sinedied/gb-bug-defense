@@ -1,6 +1,7 @@
 #include "pause.h"
 #include "input.h"
 #include "menu.h"
+#include "music.h"
 #include "enemies.h"
 #include "projectiles.h"
 #include "cursor.h"
@@ -87,6 +88,10 @@ void pause_open(void) {
     /* Hide the placement cursor entirely: it has no function while
      * paused and would burn an extra per-scanline sprite. */
     move_sprite(OAM_CURSOR, 0, 0);
+    /* Iter-3 #16 (D-MUS-4): duck NR50 to 0x33 (~43%) on pause. The
+     * upgrade/sell menu does NOT duck (it's transient and doesn't
+     * pause gameplay). */
+    music_duck(1);
 }
 
 void pause_close(void) {
@@ -96,6 +101,8 @@ void pause_close(void) {
      * BEFORE consuming the flag via pause_quit_requested(). */
     hide_pause_oam();
     cursor_blink_pause(false);
+    /* Iter-3 #16 (D-MUS-4): un-duck NR50 to 0x77 on pause close. */
+    music_duck(0);
 }
 
 void pause_update(void) {

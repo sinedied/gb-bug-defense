@@ -78,13 +78,21 @@ test:
     mkdir -p "{{BUILD}}"
     cc -std=c99 -Wall -Wextra -O2 -Isrc tests/test_math.c -o "{{BUILD}}/test_math"
     "{{BUILD}}/test_math"
-    # test_audio compiles src/audio.c against host stubs of <gb/gb.h> and
-    # <gb/hardware.h> (tests/stubs/) so we can assert exact NRxx_REG writes
-    # without an emulator. Stub dir must come BEFORE -Isrc on the include
-    # path so it shadows GBDK's real headers.
+    # test_audio compiles src/audio.c (and now src/music.c — audio.c
+    # calls into music.* for ch4 arbitration and master reset) against
+    # host stubs of <gb/gb.h> and <gb/hardware.h> (tests/stubs/) so we
+    # can assert exact NRxx_REG writes without an emulator. Stub dir
+    # must come BEFORE -Isrc on the include path so it shadows GBDK's
+    # real headers.
     cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
-       tests/test_audio.c src/audio.c -o "{{BUILD}}/test_audio"
+       tests/test_audio.c src/audio.c src/music.c -o "{{BUILD}}/test_audio"
     "{{BUILD}}/test_audio"
+    # test_music exercises the iter-3 #16 music engine (src/music.c) in
+    # isolation: synchronous-arm music_play, row advance, loop wrap,
+    # stinger end, idempotency, song switch, ch4 arbitration, duck.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
+       tests/test_music.c src/music.c -o "{{BUILD}}/test_music"
+    "{{BUILD}}/test_music"
     # test_pause compiles src/pause.c against the same host stubs.
     # Collaborator modules (input/menu/cursor/enemies/projectiles) are
     # stubbed inside test_pause.c so each test scripts button presses

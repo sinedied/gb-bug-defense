@@ -310,3 +310,93 @@
    flicker on every cycle, regression vs current UX;brackets 
   (c) deprioritize  input feels laggy, regression vs F1's ownselector 
   responsiveness goal.
+
+### Iter-3 #16 D-MUS-1..5 (2026-05-22)
+
+> **D-MUS-1: Custom mini music engine, no hUGETracker.** Music authored
+> as `mus_row_t[]` C arrays in `src/music.c`. Driver in
+> `src/music.{h,c}` (~600 B). Avoids GUI tooling dependency and
+> 2-3 KB hUGEDriver runtime. Future swap to hUGEDriver remains
+> possible; API surface (`music_play/stop/tick/duck`) would not change.
+
+> **D-MUS-2: Music channel allocation = CH3 (melody) + CH4 (percussion).**
+> CH1/CH2 remain SFX-only. CH3 has no SFX so no arbitration. CH4 SFX
+> (`SFX_ENEMY_HIT`/`DEATH`) preempt the music's CH4 row; music re-arms
+> at the next row boundary via `music_notify_ch4_busy/free`. Within
+> `audio_tick`: SFX advance -> ch4 edge-detect notify -> `music_tick`.
+
+> **D-MUS-3: SFX_WIN and SFX_LOSE removed.** Replaced by `MUS_WIN` /
+> `MUS_LOSE` stinger songs in `src/music.c`. Removes ch1-prio-3
+> occupancy that previously blocked TOWER_PLACE on the gameover screen.
+> The dead multi-note `sfx_def_t` fields (`note_count`,
+> `frames_per_note`, multi-element `pitches`) and the `audio_tick`
+> advance branch were also deleted; every remaining SFX is single-note.
+> `tests/test_audio.c::test_priority_preempt_rules` rewritten to use
+> CH4 (`SFX_ENEMY_DEATH` prio 2 preempts; `SFX_ENEMY_HIT` prio 1
+> rejected) - preserves the F1 lower-prio-rejected invariant on a
+> still-existing channel. Multi-note state-machine coverage migrated
+> to `tests/test_music.c`.
+
+> **D-MUS-4: Pause menu ducks NR50 to 0x33 (~43%).** Single-register
+> write on `pause_open`/`pause_close` via `music_duck(1)`/
+> `music_duck(0)`. Quit-to-title path explicitly restores `NR50=0x77`
+> after `audio_reset()` (which deliberately does not touch NR50/51/52).
+> The upgrade/sell menu does NOT duck (transient, gameplay isn't
+> paused).
+
+> **D-MUS-5: `audio_reset()` is the master reset.** Internally calls
+> `music_reset()` (silences CH3+CH4 + clears music state). Continues
+> to NOT touch NR50/51/52 (preserves F1 semantics). All existing
+> callers unchanged.
+
+> **D-MUS supplementary: synchronous-arm `music_play()`.** `music_play(id)`
+> writes row-0 NR3x/NR4x BEFORE returning, mirroring
+> `audio_play -> start_note`. Required because `enter_gameover()` blocks
+> the main loop for several frames during DISPLAY_OFF + 360-tile
+> redraw; without sync arm the WIN/LOSE stinger first note is silent.
+> `music_play(current_song)` is idempotent (returns early on same
+> song).
+
+> **D-MUS supplementary: include direction.** `audio.c` MAY include
+> `music.h` (to call `music_init/reset/tick/notify_ch4_*`). `music.c`
+> MUST NOT include `audio.h`. Avoids circular includes and keeps
+> audio.c the leaf module. The "is music CH4 row armed" check lives
+> entirely in `music.c`; audio.c calls `music_notify_ch4_busy()`
+> unconditionally (no-op when music idle).
+
+> **D-MUS supplementary: `music_init()` is init-once at boot.** Wave
+> RAM (0xFF30-0xFF3F) is loaded exactly once (DAC off via NR30=0x00,
+> 16 bytes via `_AUD3WAVERAM`, DAC stays off until first row trigger).
+> `audio_init()` calls `music_init()` AFTER NR52 master-on AND AFTER
+> the `audio_play(SFX_BOOT)` line. Ordering verified by
+> `test_audio::test_init_writes_nr52_first_and_fires_boot_chime`.
+
+> **D-MUS supplementary: MUS_NONE removed.** `enum { MUS_TITLE = 0,
+> MUS_PLAYING, MUS_WIN, MUS_LOSE, MUS_COUNT }`. Use `music_stop()`
+> for idle. Avoids empty `s_songs[]` slot, undefined
+> `music_play(MUS_NONE)`, and idempotency-check edge cases.
+
+> **D-MUS supplementary:  `music_play()` preserves SFX-owned CH4.**F1 
+> When switching songs, `music_play(other)` only silences CH4 if
+> `ch4_blocked == 0`. If an SFX (e.g. `SFX_ENEMY_DEATH`) currently owns
+> CH4, NR42 is left alone so the SFX completes naturally; the engine
+> then re-arms music CH4 at the next row boundary after
+> `music_notify_ch4_free()` lifts the block. Without this guard the
+> death SFX is truncated mid-play AND the row-0 arm is skipped (because
+> `arm_current_row()` also respects the  worst-of-both-worldsblock) 
+> silence. Regression covered by manual smoke (`tests/manual.md` F1
+> section); host tests can't easily simulate the SFX-overlap path.
+
+> **D-MUS supplementary:  CH4 SFX-end uses a two-stage latch.**F2 
+> `music_notify_ch4_free()` no longer clears `ch4_blocked` directly. It
+> sets `ch4_just_freed`; `music_tick()` clears `ch4_blocked` at the END
+> of the current tick (after the row-arm decision) and fires a deferred
+> arm via `ch4_arm_pending` at the TOP of the FOLLOWING tick. Required
+> because `audio_tick` calls `music_notify_ch4_free()` and then
+> `music_tick()` in the same frame; if `frames_left` also reaches 0 on
+> that tick, clearing the block synchronously would let
+> `arm_current_row()` re-arm CH4 zero-gap on the very frame the SFX
+> silenced (audible click on DMG, contradicts the
+1 tick of percussion silence" guarantee). Regression test:> "
+> `test_music.c::test_ch4_arbitration_boundary_on_unblock` (boundary
+ deferred arm fires).

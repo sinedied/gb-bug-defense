@@ -12,6 +12,7 @@
 #include "waves.h"
 #include "economy.h"
 #include "audio.h"
+#include "music.h"
 #include "menu.h"
 #include "pause.h"
 #include "game_modal.h"
@@ -51,6 +52,9 @@ static void enter_title(void) {
     menu_init();
     pause_init();
     title_enter();
+    /* Iter-3 #16: title theme. music_play is idempotent for the same
+     * song, so re-entries (gameover -> title) don't restart the loop. */
+    music_play(MUS_TITLE);
     s_state = GS_TITLE;
 }
 
@@ -77,15 +81,18 @@ static void enter_playing(void) {
     audio_reset();
     DISPLAY_ON;
     s_anim_frame = 0;     /* iter-3 #21: deterministic phase per session */
+    /* Iter-3 #16: in-game music starts after audio_reset() (which calls
+     * music_reset()), so no overlap with the title loop. */
+    music_play(MUS_PLAYING);
     s_state = GS_PLAYING;
 }
 
 static void enter_gameover(bool win) {
-    /* Play the win/lose stinger BEFORE gameover_enter() — that call does
-     * DISPLAY_OFF + a 360-tile redraw which blocks the main loop for several
-     * frames. Triggering the SFX first lets the channel sequencer hold the
-     * first note while audio_tick is paused. (Iter-2 spec §8 F9.) */
-    audio_play(win ? SFX_WIN : SFX_LOSE);
+    /* Iter-3 #16: WIN/LOSE music stinger replaces the iter-2 SFX_WIN/
+     * SFX_LOSE jingle (D-MUS-3). music_play is synchronous-arm, so the
+     * stinger's first note plays even though gameover_enter() blocks the
+     * main loop for several frames during DISPLAY_OFF + redraw. */
+    music_play(win ? MUS_WIN : MUS_LOSE);
     gameover_enter(win);
     s_state = win ? GS_WIN : GS_LOSE;
 }
@@ -115,9 +122,13 @@ static void playing_update(void) {
         if (pause_quit_requested()) {
             /* QUIT: silence in-flight SFX BEFORE leaving GS_PLAYING.
              * audio_reset() lives here (NOT in enter_title) to keep
-             * the boot-time NR52-first ordering invariant intact. */
+             * the boot-time NR52-first ordering invariant intact.
+             * Iter-3 #16: explicitly restore NR50 to 0x77 (un-duck)
+             * AFTER audio_reset (D-MUS-4) — audio_reset deliberately
+             * doesn't touch NR50/51/52, so we restore it here. */
             pause_close();
             audio_reset();
+            music_duck(0);
             enter_title();
             return;
         }

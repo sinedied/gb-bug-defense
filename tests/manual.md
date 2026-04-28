@@ -106,11 +106,13 @@ its blip:
    (`SFX_ENEMY_HIT`).
 4. A projectile kills any enemy — longer noise rumble on ch4
    (`SFX_ENEMY_DEATH`); priority preempts a same-frame `SFX_ENEMY_HIT`.
-5. Survive all 10 waves — ascending C-E-G-C jingle on ch1 (`SFX_WIN`).
-6. Let HP reach 0 — descending jingle on ch1 (`SFX_LOSE`).
-7. mGBA `Tools → View channels`: confirm only channels 1, 2, 4 ever
-   become active. Channel 3 (wave) stays silent throughout (reserved
-   for iter-3 music).
+5. Survive all 10 waves — `MUS_WIN` victory stinger on ch3+ch4 (replaces
+   the iter-2 `SFX_WIN` ch1 jingle, removed in iter-3 #16 / D-MUS-3).
+6. Let HP reach 0 — `MUS_LOSE` defeat stinger on ch3+ch4 (replaces the
+   iter-2 `SFX_LOSE` ch1 jingle).
+7. mGBA `Tools → View channels`: ch1/ch2 stay SFX-only (place/fire/boot);
+   ch3 (wave) is owned by music; ch4 (noise) is shared (music percussion +
+   SFX_ENEMY_HIT/DEATH preempt).
 
 ### Upgrade / sell menu UX (#12)
 1. Place an AV tower; park cursor on it; press A. A 14-sprite widget
@@ -363,3 +365,77 @@ a single early `return;`).
 5. Press START — gameplay enters cleanly; HUD digits render without
    tearing (sanity check that the title-side fix did not regress the
    transition).
+
+### Music (#16) - iter-3
+Setup: launch with `just run` (mGBA `-C mute=0 -C volume=0x100`). Audio
+unmuted on host.
+
+1. **Boot chime + title theme** - Power on. Hear the ~200 ms `SFX_BOOT`
+   ch2 chime, IMMEDIATELY followed by `MUS_TITLE` looping on ch3+ch4
+   (calm arpeggio, ~9.6 s loop). No silence gap > 1 s between them.
+2. **Title -> Playing transition** - Press START on title. `MUS_TITLE`
+   stops; `MUS_PLAYING` begins within 1 frame (driving 16-row loop on
+   ch3 with kick/snare/hat on ch4). No stuck wave note (a single click
+   is acceptable).
+3. **In-game SFX over music** - Place a tower (ch1 SFX_TOWER_PLACE),
+   fire (ch2 SFX_TOWER_FIRE), let an enemy take damage (ch4
+   SFX_ENEMY_HIT/DEATH). All play AUDIBLY OVER the ch3 melody. The ch4
+   percussion line goes momentarily silent during ENEMY_HIT/DEATH and
+   resumes at the next row boundary (no double-trigger click).
+4. **Win stinger** - Survive all waves. `MUS_PLAYING` stops; `MUS_WIN`
+   plays once (~1.5 s ascending C-E-G-C with kick/snare); silence
+   afterwards (no loop).
+5. **Lose stinger** - Let HP reach 0. `MUS_PLAYING` stops; `MUS_LOSE`
+   plays once (~1.6 s descending C-A-F-D-C with kick); silence after.
+6. **Pause ducking** - During `MUS_PLAYING`, press START. NR50 drops
+   from 0x77 to 0x33; music + any subsequent SFX are audibly quieter
+   (~half loudness). Closing pause (A on RESUME) restores full volume.
+7. **Quit-to-title restores volume** - During `MUS_PLAYING`, START to
+   pause, DOWN, A on QUIT. Returns to title with `MUS_TITLE` at full
+   NR50=0x77 volume.
+8. **Loop point** - Sit on title screen for 60 s. `MUS_TITLE` loops
+   seamlessly. No audible discontinuity at the row 23 -> row 0
+   boundary (the snare hit on row 23 telegraphs the loop).
+9. **Idempotent play** - Internal: re-entering an already-active state
+   does not restart `MUS_TITLE` row 0. Verified by host test_music
+   case (e); manually not directly observable.
+10. **Upgrade/sell menu does NOT duck** - Open the upgrade menu on a
+    placed tower. Volume stays at full 0x77 (D-MUS-4). Closing the
+    menu also leaves volume unchanged.
+11. **mGBA channel viewer** - `Tools -> View channels`. CH3 (wave)
+    is active whenever music is playing; CH4 (noise) is active mostly
+    continuously (alternating music percussion and SFX). CH1/CH2 are
+    only active for SFX events.
+
+## Music engine: F1 / F2 cross-cutting smoke (MANUAL-REQUIRED)
+
+These two paths are not host-testable (they require simultaneous
+SFX playback, music transitions and NRxx state inspection on real
+DMG / mGBA). Run them after any change to `src/music.c` or
+`src/audio.c`.
+
+### F1: song switch preserves SFX-owned CH4
+
+1. Start a wave; let an enemy reach low HP.
+2. Trigger the killing shot so `SFX_ENEMY_DEATH` (8 frames on CH4)
+   fires on the LAST enemy of the wave (so the win transition runs
+   while the death SFX is still audible).
+3. Expected:
+   - The death SFX completes  no truncation.naturally 
+   - `MUS_WIN`'s CH3 melody starts immediately on the win transition.
+   - `MUS_WIN`'s CH4 percussion starts at the first row boundary
+     after the death SFX 1 tick of percussion silence betweenends (
+     SFX end and music ch4 re- F2 latch).arm 
+4. Failure mode (regression):
+   - Death SFX cut short the moment the transition fires (F1 broken),
+     or audible click on the SFX-end frame (F2 broken).
+
+### F2: simultaneous SFX-end + music row boundary
+
+1. Start a long wave to maximize CH4 SFX activity.
+2. Listen for any CH4 click/pop coinciding with a percussion hit
+   immediately after `SFX_ENEMY_HIT` (3 frames) or `SFX_ENEMY_DEATH`
+   (8 frames) ends.
+3. Expected: no  there is always at least one tick of silenceclick 
+   between the SFX envelope ending and the next music percussion
+   trigger.
