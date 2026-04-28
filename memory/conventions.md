@@ -85,3 +85,48 @@ Predicates that decide modal precedence / cross-modal gating belong in a header-
 - **BG-write budget (revised)**: ≤ 16 writes/frame remains the cap. `towers_render` contributes **at most 1** write/frame total — sell, place, and idle phases each `return;` after writing, so they are mutually exclusive within a single call. Updated worst-case: 10 (HUD) + 4 (corruption) + 1 (towers) = **15**. The idle scanner's 1-write/frame ceiling is non-negotiable; do not "drain all stale" in one frame.
 - **Modal gating extended**: any new "ambient" BG-write source MUST gate on `!game_is_modal_open()` (towers idle is the precedent). Animation timers tied to entity ticks (e.g. `flash_timer` inside `enemies_update`) freeze automatically because their host `_update` is already gated. Do NOT add cross-module tick paths that bypass modal gating.
 - **Pure-helper headers**: `src/map_anim.h`, `src/enemies_anim.h`, and `src/towers_anim.h` join `src/tuning.h` and `src/game_modal.h` as host-testable header-only modules. All three new headers MUST use `<stdint.h>` directly (NOT `gtypes.h`, which transitively pulls `<gb/gb.h>`). Tests in `tests/test_anim.c` link without GBDK stubs.
+
+### Iter-3 #20 conventions (2026-05-15)
+- **Difficulty is global, persistent within a power-on session**:
+  `static u8 s_difficulty = DIFF_NORMAL;` at file scope in `src/game.c`. Read
+  via `game_difficulty()`. Do NOT reset it in `enter_title()` or
+  `enter_playing()`. SRAM persistence is feature #19 (separate spec).
+- **Difficulty enum lives in `src/difficulty_calc.h`** (NOT `game.h`):
+  `enum { DIFF_EASY=0, DIFF_NORMAL=1, DIFF_HARD=2, DIFF_COUNT=3 };`. `game.h`
+  `#include`s `difficulty_calc.h` so on-device callers see the enum
+  transitively, and host tests can include `difficulty_calc.h` directly
+  without pulling `gtypes.h` / `<gb/gb.h>`. Use the symbolic names; the
+  integer values are also the indices into `DIFF_ENEMY_HP[diff][type]` — do
+  not reorder.
+- **Three difficulty read sites only**: enemies.c (HP at spawn), waves.c
+  (delay at event arming), economy.c (starting energy at init). Adding a
+  new read site requires updating the test coverage in
+  `tests/test_difficulty.c`.
+- **Pure-helper headers (extended)**: `src/difficulty_calc.h` joins the
+  `<stdint.h>`-only family (`tuning.h`, `game_modal.h`, `*_anim.h`). It
+  includes `tuning.h` only — never a GBDK header.
+- **Spawn-interval engine floor is 30 frames** (was 50 under iter-2 D12,
+  now superseded — D12's 50-frame floor was a NORMAL balance number, not
+  an engine invariant). Enforced inside `difficulty_scale_interval`.
+- **Title screen owns no game state**: the difficulty selector renders
+  `game_difficulty()` directly and writes back via `game_set_difficulty()`.
+  Title carries no shadow copy.
+- **Title-screen selector input is edge-only**: D-pad LEFT/RIGHT on title
+  uses `input_is_pressed` (NOT `input_is_repeat`). 3-state cycles are too
+  short for auto-repeat to feel right (overshoot on a held D-pad). The
+  iter-1 "D-pad auto-repeat for menu navigation" convention applies to
+  cursor movement and to in-game menus with >3 items; short title-screen
+  selectors are exempted.
+
+### Iter-3 #20  clarification (2026-05-16)conventions 
+- **"Three difficulty read sites only" applies to gameplay-scaling
+  consumers** (enemies HP at spawn, waves spawn delay, economy starting
+  energy). UI-display read  currently `src/title.c::draw_diff_now`sites 
+  reading `game_difficulty()` for the `< LABEL >`  are NOTselector 
+  counted and do NOT require updating `tests/test_difficulty.c`. New
+  gameplay-scaling sites still require new test coverage; new
+  UI-display sites do not.
+- **Title BG-write VBlank budget**: `title_render` services at most ONE
+  dirty region per frame (selector first, blink deferred). This caps
+  title at 12 writes/frame (the  within the 16-write cap. Seeprompt) 
+  decisions.md "Title VBlank: selector-first, blink-deferred".

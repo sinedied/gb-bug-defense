@@ -1,6 +1,8 @@
 #include "waves.h"
 #include "enemies.h"
 #include "hud.h"
+#include "difficulty_calc.h"
+#include "game.h"
 
 /* Iter-2 wave script: 10 waves, mixed bug+robot composition.
  * Each wave is a const list of (type, delay) spawn events. The first event's
@@ -149,7 +151,7 @@ void waves_update(void) {
                 s_timer = nxt_delay;
             }
         } else {
-            s_timer = s_waves[s_cur].events[s_event_idx].delay;
+            s_timer = difficulty_scale_interval(s_waves[s_cur].events[s_event_idx].delay, game_difficulty());
         }
     } else {
         s_timer = 8;   /* pool full — retry shortly */

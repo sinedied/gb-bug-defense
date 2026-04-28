@@ -3,6 +3,8 @@
 #include "map.h"
 #include "economy.h"
 #include "assets.h"
+#include "difficulty_calc.h"
+#include "game.h"
 #include <gb/gb.h>
 
 typedef struct {
@@ -68,7 +70,7 @@ bool enemies_spawn(u8 type) {
         const waypoint_t *wp = map_waypoints();
         s_enemies[i].x = wp_x_fix(wp[0].tx);
         s_enemies[i].y = wp_y_fix(wp[0].ty);
-        s_enemies[i].hp = s_enemy_stats[type].hp;
+        s_enemies[i].hp = difficulty_enemy_hp(type, game_difficulty());
         s_enemies[i].wp_idx = 0;
         s_enemies[i].anim = 0;
         s_enemies[i].alive = 1;

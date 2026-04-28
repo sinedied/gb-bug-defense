@@ -126,6 +126,24 @@ FONT = {
         "..#..",
         ".....",
     ],
+    '<': [
+        "...#.",
+        "..#..",
+        ".#...",
+        "#....",
+        ".#...",
+        "..#..",
+        "...#.",
+    ],
+    '>': [
+        ".#...",
+        "..#..",
+        "...#.",
+        "....#",
+        "...#.",
+        "..#..",
+        ".#...",
+    ],
     '0': [".###.","#...#","#..##","#.#.#","##..#","#...#",".###."],
     '1': ["..#..",".##..","..#..","..#..","..#..","..#..",".###."],
     '2': [".###.","#...#","....#","...#.","..#..",".#...","#####"],
@@ -637,16 +655,10 @@ SPR_GLYPH_S     = glyph_to_sprite('S')
 SPR_GLYPH_E     = glyph_to_sprite('E')
 SPR_GLYPH_L     = glyph_to_sprite('L')
 SPR_GLYPH_COLON = glyph_to_sprite(':')
-# '>' isn't in FONT; create a small chevron glyph that matches the 5x7 style.
-FONT['>'] = [
-    ".#...",
-    "..#..",
-    "...#.",
-    "....#",
-    "...#.",
-    "..#..",
-    ".#...",
-]
+# '>' lives in the FONT dict literal above (subtask 1 of iter-3 #20 — was a
+# late assignment here, but that left BG tile 62 blank and only the sprite
+# bank populated; consolidating into the dict literal keeps BG and sprite
+# in lockstep).
 SPR_GLYPH_GT    = glyph_to_sprite('>')
 SPR_GLYPH_DASH  = glyph_to_sprite('-')
 SPR_GLYPH_0     = glyph_to_sprite('0')

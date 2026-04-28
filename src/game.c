@@ -22,10 +22,19 @@ enum { GS_TITLE, GS_PLAYING, GS_WIN, GS_LOSE };
 static u8 s_state;
 static u8 s_selected_type;     /* iter-2: TOWER_AV | TOWER_FW */
 static u8 s_anim_frame;        /* iter-3 #21: global animation phase */
+/* Iter-3 #20: file-scope so it survives enter_title()/enter_playing()
+ * cycles within a power-on session. NOT zero-init — relies on crt0's
+ * .data copy from ROM (acceptance scenario #1 is the regression guard). */
+static u8 s_difficulty = DIFF_NORMAL;
 
 u8 game_get_selected_tower_type(void) { return s_selected_type; }
 
 u8 game_anim_frame(void) { return s_anim_frame; }
+
+u8 game_difficulty(void) { return s_difficulty; }
+void game_set_difficulty(u8 d) {
+    if (d < DIFF_COUNT) s_difficulty = d;
+}
 
 bool game_is_modal_open(void) {
     /* Single source of truth — keep aligned with playing_update's

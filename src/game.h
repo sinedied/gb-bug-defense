@@ -2,6 +2,7 @@
 #define GBTD_GAME_H
 
 #include "gtypes.h"
+#include "difficulty_calc.h"
 
 void game_init(void);
 void game_update(void);
@@ -18,5 +19,11 @@ bool game_is_modal_open(void);
  * blink today; future ambient anims). Wraps at 256. Reset to 0 on
  * enter_playing(). Incremented once per game_update(). */
 u8   game_anim_frame(void);
+
+/* Iter-3 #20: difficulty (EASY / NORMAL / HARD). Persists across
+ * enter_title()/enter_playing() within a power-on session; SRAM is
+ * feature #19. Setter is a no-op for d >= DIFF_COUNT. */
+u8   game_difficulty(void);
+void game_set_difficulty(u8 d);
 
 #endif

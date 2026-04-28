@@ -1,6 +1,8 @@
 #include "economy.h"
 #include "hud.h"
 #include "map.h"
+#include "difficulty_calc.h"
+#include "game.h"
 
 static u8  s_hp;
 static u8  s_energy;
@@ -8,7 +10,7 @@ static u16 s_passive_timer;       /* iter-2 */
 
 void economy_init(void) {
     s_hp = START_HP;
-    s_energy = START_ENERGY;
+    s_energy = difficulty_starting_energy(game_difficulty());
     s_passive_timer = 0;
     map_set_computer_state(s_hp);
     hud_mark_hp_dirty();

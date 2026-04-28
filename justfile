@@ -104,6 +104,13 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Isrc \
        tests/test_anim.c -o "{{BUILD}}/test_anim"
     "{{BUILD}}/test_anim"
+    # test_difficulty exercises the iter-3 #20 pure helper in
+    # src/difficulty_calc.h (header-only, <stdint.h> only — no GBDK
+    # linkage). Covers HP table, spawn scaler + 30-frame floor, energy
+    # lookup, cycle wrap math, junk-input clamps.
+    cc -std=c99 -Wall -Wextra -O2 -Isrc \
+       tests/test_difficulty.c -o "{{BUILD}}/test_difficulty"
+    "{{BUILD}}/test_difficulty"
 
 # Build + launch emulator (one-command playtest)
 #

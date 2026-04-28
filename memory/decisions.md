@@ -252,3 +252,61 @@
 - **Decision**: Actual WRAM growth for iter-3 #21 is **32 B**, not 31 B. Breakdown: 14 (enemy flash_timer) + 16 (tower last_state) + 1 (game.c s_anim_frame) + 1 (towers.c s_idle_scan_idx) = 32 B. Code is correct as implemented; only the spec's documented projection was off by 1 B. Per project rule "Do NOT modify `specs/`", correction is recorded here for traceability.
 - **Rationale**: 1 B over a 31 B projection is well inside any practical WRAM budget for the game; no design change warranted. Recorded so future audits don't chase the missing byte.
 - **Alternatives**: Edit the spec — rejected (project rule).
+
+### Iter-3 #20: Difficulty modes — 2-D HP table, formula spawn scaler, BG-only title selector
+- **Date**: 2026-05-15
+- **Context**: Roadmap #20 — Easy/Normal/Hard scaling HP + spawn rate.
+- **Decision**: Difficulty is a `u8 s_difficulty` static at file scope in
+  `src/game.c`, initialised to `DIFF_NORMAL`, never reset by `enter_title()` or
+  `enter_playing()` (so quit-to-title preserves selection within a power-on
+  session; SRAM is feature #19). Enum `{DIFF_EASY=0, DIFF_NORMAL=1, DIFF_HARD=2}`
+  in `src/difficulty_calc.h` (host-testable header — `game.h` re-exports via
+  `#include`); getter `game_difficulty()` / setter `game_set_difficulty()`.
+  Pure header `src/difficulty_calc.h` (joins `tuning.h`, `game_modal.h`,
+  `*_anim.h` as `<stdint.h>`-only host-testable helpers) holds: a 2-D 6-byte
+  `DIFF_ENEMY_HP[3][2]` table (EASY {2,4} / NORMAL {BUG_HP, ROBOT_HP} / HARD
+  {5,9}) — chosen over a single multiplier because user's HARD targets
+  (bug=5, robot=9) imply non-uniform ratios; a `(base*num)>>3` spawn-interval
+  scaler with global 30-frame floor (HARD num=6 ×0.75, EASY num=12 ×1.5);
+  and a 3-entry starting-energy lookup (EASY=45, NORMAL=30, HARD=24). Title
+  screen renders selector `< LABEL >` at row 10 cols 5..14 in BG tiles (no
+  OAM); LEFT/RIGHT edge-only (`input_is_pressed`) cycle with wrap; A and B
+  inert; START commits and calls `enter_playing()` unchanged. Tower stats
+  and wave composition are difficulty-invariant; the iter-2 D12 50-frame
+  spawn floor is now a NORMAL-balance number, superseded by the engine-wide
+  30-frame floor.
+- **Rationale**: 2-D HP table = exact designer intent for 6 B; formula spawn
+  scaler = O(1) over many base delays; BG selector = zero OAM/render cost
+  reusing the existing dirty-flag pattern from PRESS-START blink. File-scope
+  static persistence avoids touching `enter_*` and is the simplest possible
+  "remember last selection within session". Edge-only cycle prevents
+  over-cycling on a held D-pad in a 3-state selector.
+- **Alternatives**: Per-difficulty single HP multiplier (rejected — can't
+  match user's targets); per-(diff, base) spawn lookup table (rejected —
+  combinatorial); HUD letter indicator (rejected — HUD row 0 fully occupied
+  by iter-2 convention; reflow disproportionate); difficulty stored in
+  `title.c` (rejected — it's cross-module state, `game.c` is the right
+  owner); resetting `s_difficulty` in `enter_title` (rejected — would lose
+  the selection on quit-to-title); `input_is_repeat` for cycling (rejected
+  per D9 — would over-cycle on held D-pad).
+
+### Title VBlank: selector-first, blink-deferred
+- **Date**: 2026-05-16
+- **Context**: F1 (MEDIUM) review finding on iter-3 #20. `title_render`
+  serviced both `s_diff_dirty` (10 writes) and `s_dirty` (12 writes) in
+  the same VBlank when LEFT/RIGHT landed on the same frame as the 30-frame
+ tile corruption
+  reachable ~once per 0.5 s of active cycling on real DMG.
+- **Decision**: Service at most one dirty region per `title_render` call.
+  Selector wins (user input must be visually responsive within 1 frame);
+  blink is deferred 1 frame and re-fires on the next 30-frame edge anyway.
+  Implemented as an early `return;` after `draw_diff_now()` in
+  `src/title.c::title_render`.
+- **Rationale**: Cheapest fix that keeps the established 16-write/frame
+  budget intact. No new state, no new flags, no logic change to update.
+  Worst-case title contribution drops from 22 to 12 writes.
+- **Alternatives**: (a) split prompt redraw across two frames (6+ adds6) 
+  state and complicates the blink; (b) move title to `DISPLAY_OFF`
+   flicker on every cycle, regression vs current UX;brackets 
+  (c) deprioritize  input feels laggy, regression vs F1's ownselector 
+  responsiveness goal.

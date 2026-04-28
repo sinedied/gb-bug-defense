@@ -309,3 +309,57 @@ press START, and walk through the scenarios below. Each maps to one of
     `projectiles_update()` in `playing_update()`). Not host-testable:
     update ordering plus PPU/audio timing make this a manual-only
     check. 
+
+## Iter-3 # Difficulty modes (EASY / NORMAL / HARD)20 
+
+Setup: `just build && just run`. mGBA controls: arrows = D-pad,
+`Z` = A, `X` = B, `Enter` = START.
+
+| #  | Scenario                            | Steps                                                                                                                | Expected                                                                                                |
+|----|-------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| D1 | Default on cold boot                | Power on → title.                                                                                                    | Selector shows `< NORMAL >` centered on row 10. PRESS START blinks below.                               |
+| D2 | Cycle right with wrap               | RIGHT, RIGHT, RIGHT.                                                                                                 | After 1st `< HARD >`; after 2nd wraps to `< EASY >`; after 3rd `< NORMAL >`.                            |
+| D3 | Cycle left with wrap                | From default NORMAL: LEFT, LEFT, LEFT.                                                                               | After 1st `< EASY >`; after 2nd wraps to `< HARD >`; after 3rd `< NORMAL >`.                            |
+| D4 | A / B inert on title                | Press A; press B.                                                                                                    | No visual change; selector stays put; no state transition.                                              |
+| D5 | START commits — starting energy     | Set EASY → press START.                                                                                              | Game enters PLAYING. HUD shows `E:045` immediately.                                                     |
+| D6 | HARD spawn faster + lower wallet    | Title → HARD → START → wait through W1 grace, place 1 antivirus on a path-adjacent tile, then watch W1 spawns.       | HUD `E:024` right after START. Inter-spawn gap visibly tighter than NORMAL (~38 f vs 50 f over 5 bugs). |
+| D7 | EASY HUD energy                     | Title → EASY → START.                                                                                                | HUD `E:045` immediately after START.                                                                    |
+| D8 | Quit-to-title preserves selection   | Title → HARD → START → pause → QUIT → back at title.                                                                 | Selector still `< HARD >` (not reset to NORMAL).                                                        |
+| D9 | Game-over preserves selection       | Title → EASY → START → lose deliberately → press START on lose screen.                                               | Back at title; selector still `< EASY >`.                                                               |
+| D10| Win-over preserves selection        | Title → NORMAL → win all 10 waves → press START on win screen.                                                       | Back at title; selector still `< NORMAL >`.                                                             |
+| D11| Power-off resets                    | Power off mGBA, power on.                                                                                            | Selector defaults to `< NORMAL >` (no SRAM).                                                            |
+| D12| Pause works on every difficulty     | Repeat D5 / D6 / D7 with one pause+resume during gameplay.                                                           | Pause modal opens/closes identically. No SFX or visual difference between modes.                        |
+| D13| Visual / audio parity               | Compare W1 on EASY vs HARD.                                                                                          | Same bug sprites, same audio cues, same HUD layout. Only HP, spawn timing, and starting `E:` differ.    |
+| D14| EASY beatable, HARD beatable        | Play through all 10 waves on EASY (casual) and HARD (focused).                                                       | Both runs reach the WIN screen.                                                                         |
+
+**Note on HARD late waves**: by design, HARD wave 10's scaled spawn delay
+ 37 frames) outpaces path traversal so the `MAX_ENEMIES = 14` pool
+saturates. `waves.c` falls back to retry every 8 frames (existing iter-2
+back-pressure). Expected, not a regression.
+
+### Iter-3 #20 — F1 (MEDIUM) regression: title VBlank BG-write budget
+
+On the title screen, hold LEFT or RIGHT briefly (about 2 seconds) then
+release. The selector and PRESS START prompt areas must remain pristine
+— no garbled tiles — regardless of the timing of releases relative to
+the 30-frame blink edge.
+
+**Automated:** none. Frame-ordering / VBlank PPU timing is not observable
+from a host harness. Pure-helper extraction was not warranted (the fix is
+a single early `return;`).
+
+**Manual on-device check (mGBA / real DMG):**
+1. Boot to title; selector reads `< NORMAL >`, PRESS START blinks.
+2. Hold LEFT for ~2 s, then release. While held, the selector cycles
+   continuously through EASY/HARD/NORMAL.
+3. Repeat with RIGHT held for ~2 s.
+4. Pass = the difficulty selector row (row 10, cols 5..14) AND the
+   PRESS START prompt row (row 13, cols 4..15) remain pristine — no
+   garbled / half-drawn / "stuck blank" tiles, regardless of where the
+   30-frame blink edge lands relative to the input. Pre-fix, the same
+   action would intermittently corrupt ~6 tiles per second of holding
+   because `title_render` emitted 22 BG writes (10 selector + 12 prompt)
+   in a single VBlank, past the ~16-write budget.
+5. Press START — gameplay enters cleanly; HUD digits render without
+   tearing (sanity check that the title-side fix did not regress the
+   transition).
