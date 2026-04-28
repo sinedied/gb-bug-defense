@@ -21,8 +21,11 @@ enum { GS_TITLE, GS_PLAYING, GS_WIN, GS_LOSE };
 
 static u8 s_state;
 static u8 s_selected_type;     /* iter-2: TOWER_AV | TOWER_FW */
+static u8 s_anim_frame;        /* iter-3 #21: global animation phase */
 
 u8 game_get_selected_tower_type(void) { return s_selected_type; }
+
+u8 game_anim_frame(void) { return s_anim_frame; }
 
 bool game_is_modal_open(void) {
     /* Single source of truth — keep aligned with playing_update's
@@ -64,6 +67,7 @@ static void enter_playing(void) {
      * every subsequent ch1 SFX (e.g. tower-place) for the rest of the run. */
     audio_reset();
     DISPLAY_ON;
+    s_anim_frame = 0;     /* iter-3 #21: deterministic phase per session */
     s_state = GS_PLAYING;
 }
 
@@ -177,6 +181,12 @@ static void playing_render(void) {
 }
 
 void game_update(void) {
+    /* Iter-3 #21: tick the global animation phase once per game_update,
+     * BEFORE the per-state switch, so every observer (towers idle
+     * scanner, future anims) sees a consistent value within a frame.
+     * 1-byte counter wraps at 256; all phase divisors used (32, 64)
+     * divide it evenly. */
+    s_anim_frame++;
     switch (s_state) {
     case GS_TITLE:
         title_update();

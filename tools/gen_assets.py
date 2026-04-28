@@ -349,6 +349,128 @@ def tower2_bg_tile():
 
 TOWER2_BG = tower2_bg_tile()
 
+# ----------------------------------------------------------------------------
+# Iter-3 #21: animated/corruption BG tiles. The design doc
+# (specs/iter3-21-animations-design.md) provides ASCII grids using:
+#   '.' = W (white)
+#   ',' = L (light grey)
+#   'o' = D (dark grey)
+#   '#' = B (black)
+# Translate verbatim — no creative re-interpretation.
+# ----------------------------------------------------------------------------
+
+def design_tile(art):
+    """8x8 tile from design-doc ASCII (.=W, ,=L, o=D, #=B)."""
+    rows = []
+    for line in art:
+        if len(line) != 8:
+            raise ValueError("design row must be 8 chars: %r" % line)
+        r = []
+        for ch in line:
+            if   ch == '.': r.append(W)
+            elif ch == ',': r.append(L)
+            elif ch == 'o': r.append(D)
+            elif ch == '#': r.append(B)
+            else: raise ValueError("design char: %r" % ch)
+        rows.append(r)
+    if len(rows) != 8:
+        raise ValueError("design tile must be 8 rows")
+    return encode(rows)
+
+# Computer corruption tiles -- 7 new BG tiles, per design doc §1.
+COMP_TL_C1 = design_tile([
+    "########",
+    "#ooooooo",
+    "#o,,,,,,",
+    "#o,,,,,,",
+    "#o,,,##,",
+    "#o,,,#,,",
+    "#o,,,,,,",
+    "#o,,,,,,",
+])
+COMP_TL_C2 = design_tile([
+    "########",
+    "#ooooooo",
+    "#o,,,,,,",
+    "#o######",
+    "#o,,,##,",
+    "#o,,,#,,",
+    "#o,,,,,,",
+    "#o,,,,,,",
+])
+COMP_TR_C2 = design_tile([
+    "########",
+    "ooooooo#",
+    ",,,,,,o#",
+    "######o#",
+    ",##,,,o#",
+    ",,,,,,o#",
+    ",,,,,,o#",
+    ",,,,,,o#",
+])
+COMP_TL_C3 = design_tile([
+    "########",
+    "#ooooooo",
+    "#o,,,.,,",
+    "#o######",
+    "#o,,,##,",
+    "#o,,,#,,",
+    "#o,,#,,,",
+    "#o,,,,,,",
+])
+COMP_TR_C3 = design_tile([
+    "########",
+    "ooooooo#",
+    ",,,,,,o#",
+    "######o#",
+    ",##,,,o#",
+    ",,,,#,o#",
+    ",,,,,,o#",
+    ",,,,,,o#",
+])
+COMP_BL_C3 = design_tile([
+    "#,,,,,,,",
+    "#,,,,#,,",
+    "#,,,,,#,",
+    "#,,,,,#,",
+    "#,,,,,,,",
+    "#,,,,,,,",
+    "#ooooooo",
+    "########",
+])
+COMP_BR_C3 = design_tile([
+    ",,,,,,,#",
+    ",,,#,,,#",
+    ",,,,,,,#",
+    ",#,,,,,#",
+    ",,,,,,,#",
+    ",,.,,,,#",
+    "ooooooo#",
+    "########",
+])
+
+# Tower idle frame B tiles -- 1-pixel diff from frame A, per design doc §4.
+TOWER_BG_B = design_tile([
+    ".,o##o,.",
+    ",o####o,",
+    "o##oo##o",
+    "#o#.,#o#",
+    "#o#..#o#",
+    "o##oo##o",
+    ",o####o,",
+    ".,o##o,.",
+])
+TOWER2_BG_B = design_tile([
+    ".######.",
+    "#o##o##o",
+    "########",
+    "o##.##oo",
+    "########",
+    "#o##o##o",
+    "########",
+    ".######.",
+])
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -362,6 +484,16 @@ map_tiles = [
     ('TILE_COMP_BR_D', COMP_BR_D),
     ('TILE_TOWER',    TOWER_BG),
     ('TILE_TOWER_2',  TOWER2_BG),
+    # Iter-3 #21: corruption + tower idle B frames.
+    ('TILE_COMP_TL_C1', COMP_TL_C1),
+    ('TILE_COMP_TL_C2', COMP_TL_C2),
+    ('TILE_COMP_TR_C2', COMP_TR_C2),
+    ('TILE_COMP_TL_C3', COMP_TL_C3),
+    ('TILE_COMP_TR_C3', COMP_TR_C3),
+    ('TILE_COMP_BL_C3', COMP_BL_C3),
+    ('TILE_COMP_BR_C3', COMP_BR_C3),
+    ('TILE_TOWER_B',    TOWER_BG_B),
+    ('TILE_TOWER_2_B',  TOWER2_BG_B),
 ]
 
 # ----------------------------------------------------------------------------
@@ -536,6 +668,32 @@ SPR_GLYPH_Q     = glyph_to_sprite('Q')
 SPR_GLYPH_I     = glyph_to_sprite('I')
 SPR_GLYPH_T     = glyph_to_sprite('T')
 
+# Iter-3 #21: hit-flash sprite variants (3-frame override on non-killing
+# damage). Per design doc §2/§3 the recipe is "swap B->L, D->W" applied
+# to the A walk frame so the sprite reads as a bright/light silhouette
+# while keeping its outline. Designed as a verbatim translation of the
+# design grids (chars: '.'=W, ','=L, 'o'=D, '#'=B).
+SPR_BUG_FLASH = design_tile([
+    ",.,..,.,",
+    ".,,,,,,.",
+    ".,,..,,.",
+    ",,,,,,,,",
+    ".,,,,,,.",
+    ".,,,,,,.",
+    ",.,..,.,",
+    ".......,",
+])
+SPR_ROBOT_FLASH = design_tile([
+    "....,...",
+    "..,,,,..",
+    "..,..,..",
+    "..,,,,..",
+    ".,,,,,,.",
+    ".,....,.",
+    ".,....,.",
+    ".,,..,,.",
+])
+
 sprite_tiles = [
     ('SPR_CURSOR_A',    SPR_CURSOR_A),
     ('SPR_CURSOR_B',    SPR_CURSOR_B),
@@ -572,6 +730,8 @@ sprite_tiles = [
     ('SPR_GLYPH_Q',     SPR_GLYPH_Q),
     ('SPR_GLYPH_I',     SPR_GLYPH_I),
     ('SPR_GLYPH_T',     SPR_GLYPH_T),
+    ('SPR_BUG_FLASH',   SPR_BUG_FLASH),
+    ('SPR_ROBOT_FLASH', SPR_ROBOT_FLASH),
 ]
 
 # ----------------------------------------------------------------------------
@@ -728,7 +888,16 @@ assets_h = """\
 #define TILE_COMP_BR_D  (MAP_TILE_BASE + 9)
 #define TILE_TOWER      (MAP_TILE_BASE + 10)
 #define TILE_TOWER_2    (MAP_TILE_BASE + 11)
-#define MAP_TILE_COUNT  12
+#define TILE_COMP_TL_C1 (MAP_TILE_BASE + 12)
+#define TILE_COMP_TL_C2 (MAP_TILE_BASE + 13)
+#define TILE_COMP_TR_C2 (MAP_TILE_BASE + 14)
+#define TILE_COMP_TL_C3 (MAP_TILE_BASE + 15)
+#define TILE_COMP_TR_C3 (MAP_TILE_BASE + 16)
+#define TILE_COMP_BL_C3 (MAP_TILE_BASE + 17)
+#define TILE_COMP_BR_C3 (MAP_TILE_BASE + 18)
+#define TILE_TOWER_B    (MAP_TILE_BASE + 19)
+#define TILE_TOWER_2_B  (MAP_TILE_BASE + 20)
+#define MAP_TILE_COUNT  21
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1
@@ -765,7 +934,9 @@ assets_h = """\
 #define SPR_GLYPH_Q     32
 #define SPR_GLYPH_I     33
 #define SPR_GLYPH_T     34
-#define SPRITE_TILE_COUNT 35
+#define SPR_BUG_FLASH   35
+#define SPR_ROBOT_FLASH 36
+#define SPRITE_TILE_COUNT 37
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

@@ -1,10 +1,12 @@
 #include "towers.h"
+#include "towers_anim.h"
 #include "map.h"
 #include "economy.h"
 #include "enemies.h"
 #include "projectiles.h"
 #include "audio.h"
 #include "assets.h"
+#include "game.h"
 #include <gb/gb.h>
 #include <string.h>
 
@@ -21,6 +23,7 @@ typedef struct {
     u8 type;        /* TOWER_AV | TOWER_FW */
     u8 level;       /* 0 | 1 */
     u8 spent;       /* cumulative energy spent (cost + any upgrade) */
+    u8 idle_phase;  /* iter-3 #21: last-painted LED phase (0 or 1) */
 } tower_t;
 
 typedef struct { u8 tx, ty; } clear_tile_t;
@@ -45,6 +48,7 @@ static const tower_stats_t s_tower_stats[TOWER_TYPE_COUNT] = {
 static tower_t      s_towers[MAX_TOWERS];
 static u16          s_pending_mask;            /* bit i = clear pending */
 static clear_tile_t s_pending_tiles[MAX_TOWERS];
+static u8           s_idle_scan_idx;           /* iter-3 #21: round-robin cursor */
 
 const tower_stats_t *towers_stats(u8 type) {
     return &s_tower_stats[type];
@@ -58,8 +62,10 @@ void towers_init(void) {
         s_towers[i].type = TOWER_AV;
         s_towers[i].level = 0;
         s_towers[i].spent = 0;
+        s_towers[i].idle_phase = 0;
     }
     s_pending_mask = 0;
+    s_idle_scan_idx = 0;
     memset(s_pending_tiles, 0, sizeof s_pending_tiles);
 }
 
@@ -113,6 +119,7 @@ bool towers_try_place(u8 tx, u8 ty, u8 type) {
     s_towers[slot].cooldown = s_tower_stats[type].cooldown;
     s_towers[slot].alive = 1;
     s_towers[slot].dirty = 1;
+    s_towers[slot].idle_phase = 0;   /* matches the about-to-be-painted base tile */
     audio_play(SFX_TOWER_PLACE);
     return true;
 }
@@ -155,7 +162,7 @@ void towers_sell(u8 idx) {
 
 void towers_render(void) {
     u8 i;
-    /* Drain phase: at most 1 sell-clear per frame. */
+    /* Phase 1: at most 1 sell-clear per frame. */
     if (s_pending_mask) {
         for (i = 0; i < MAX_TOWERS; i++) {
             if (s_pending_mask & (1u << i)) {
@@ -163,19 +170,44 @@ void towers_render(void) {
                                 s_pending_tiles[i].ty + HUD_ROWS,
                                 (u8)TILE_GROUND);
                 s_pending_mask &= (u16)~(1u << i);
-                return;     /* place skipped this frame; ≤ 1 BG write/frame */
+                return;     /* place + idle skipped this frame */
             }
         }
     }
-    /* Place phase: at most 1 placement per frame. */
+    /* Phase 2: at most 1 placement per frame. */
     for (i = 0; i < MAX_TOWERS; i++) {
         if (s_towers[i].alive && s_towers[i].dirty) {
             set_bkg_tile_xy(s_towers[i].tx,
                             s_towers[i].ty + HUD_ROWS,
                             s_tower_stats[s_towers[i].type].bg_tile);
             s_towers[i].dirty = 0;
-            return;
+            return;         /* idle skipped this frame */
         }
+    }
+    /* Phase 3 (iter-3 #21): at most 1 idle-LED toggle per frame.
+     * Gated on !game_is_modal_open() so neither pause nor the
+     * upgrade/sell menu sees surprise BG writes; consistent with the
+     * "no BG writes during modal" convention. Round-robin through the
+     * tower pool from the last-touched slot so heavy bursts (16
+     * towers all transitioning at the same tick) drain fairly within
+     * ~16 frames — invisible at the 32-frame LED half-period. */
+    if (game_is_modal_open()) return;
+    u8 cur_frame = game_anim_frame();
+    u8 k;
+    for (k = 0; k < MAX_TOWERS; k++) {
+        i = (u8)((s_idle_scan_idx + k) & (MAX_TOWERS - 1)); /* MAX_TOWERS=16 */
+        if (!s_towers[i].alive) continue;
+        u8 want = towers_idle_phase_for(cur_frame, i);
+        if (want == s_towers[i].idle_phase) continue;
+        u8 base = s_tower_stats[s_towers[i].type].bg_tile;
+        u8 alt  = (s_towers[i].type == TOWER_AV)
+                  ? (u8)TILE_TOWER_B : (u8)TILE_TOWER_2_B;
+        set_bkg_tile_xy(s_towers[i].tx,
+                        s_towers[i].ty + HUD_ROWS,
+                        want ? alt : base);
+        s_towers[i].idle_phase = want;
+        s_idle_scan_idx = (u8)((i + 1) & (MAX_TOWERS - 1));
+        return;
     }
 }
 

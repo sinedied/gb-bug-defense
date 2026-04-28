@@ -82,6 +82,11 @@ static void step_proj(u8 i) {
             economy_award(bounty);
             audio_play(SFX_ENEMY_DEATH);
         } else {
+            /* Iter-3 #21: arm 3-frame hit-flash. enemies_set_flash()
+             * writes the flash tile immediately so the visual + audio
+             * feedback land on the same logic frame, even though
+             * enemies_update() already ran earlier in playing_update(). */
+            enemies_set_flash(p->target);
             audio_play(SFX_ENEMY_HIT);
         }
         p->alive = 0;

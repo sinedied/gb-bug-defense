@@ -20,4 +20,7 @@ u8   enemies_bounty(u8 idx);          /* iter-2: bounty for the alive enemy */
 /* Damage callback used by projectiles. Returns true if the hit killed it. */
 bool enemies_apply_damage(u8 idx, u8 dmg);
 
+/* Iter-3 #21: arm 3-frame hit-flash sprite override on a non-killing hit. */
+void enemies_set_flash(u8 idx);
+
 #endif

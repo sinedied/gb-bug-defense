@@ -10,7 +10,7 @@ void economy_init(void) {
     s_hp = START_HP;
     s_energy = START_ENERGY;
     s_passive_timer = 0;
-    map_set_computer_damaged(false);
+    map_set_computer_state(s_hp);
     hud_mark_hp_dirty();
     hud_mark_e_dirty();
 }
@@ -29,7 +29,7 @@ u8 economy_get_energy(void) { return s_energy; }
 void economy_damage(u8 dmg) {
     if (dmg >= s_hp) s_hp = 0;
     else s_hp -= dmg;
-    map_set_computer_damaged(s_hp <= (START_HP / 2));
+    map_set_computer_state(s_hp);
     hud_mark_hp_dirty();
 }
 

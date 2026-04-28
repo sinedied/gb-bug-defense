@@ -16,6 +16,6 @@ void map_load(void);                       /* render gameplay map onto BG;
 void map_render(void);                     /* VBlank-safe deferred redraws */
 u8   map_class_at(u8 tx, u8 ty);           /* play-field-local tile coords */
 const waypoint_t *map_waypoints(void);
-void map_set_computer_damaged(bool damaged);
+void map_set_computer_state(u8 hp);
 
 #endif

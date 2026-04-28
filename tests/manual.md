@@ -219,3 +219,93 @@ bleed, full reset on QUIT, OAM positions on real OAM).
   While paused, slots 1..16OAM)** 
     sit at the screen pixels documented in 4. Slot 0 (cursor)spec 
     and slots 17..38 are at `(0, 0)`.
+
+## Iter-3 # animated tiles & sprite polish21 
+
+Spec: `specs/iter3-21-animations.md`. Run `just check`, then `just run`,
+press START, and walk through the scenarios below. Each maps to one of
+5 acceptance scenarios.the 
+
+1. ** pristine (state  Start a new game; observe the0)** Corruption 
+   computer cluster (top-right of the play field) before any enemy
+   reaches it. All 4 quadrants render the iter-2 pristine art.
+
+ Place no towers;4)** 
+   let bugs reach the computer one at a time. After each impact the
+   cluster transitions: HP4 = single stuck pixel (TL only), HP3 =
+   horizontal scanline tear across TL+TR, HP2 = diagonal cracks +
+   "dead pixels" across all 4 quadrants, HP1 = heavy static (the
+   existing `_D` art). Each transition lands on the same frame the
+   HP digit drops (no visible lag).
+
+3. **Corruption  After scenario 2, idle for ~2 s. Thepersists** 
+   cluster stays in the new state with no flicker / no repaint.
+
+4. **HP=0 (single-bug  From HP=1 (state 4 visible), letarrival)** 
+   one more bug through. Game-over screen appears; the last play-field
+   frame shows heavy-static. (Documented limitation: a same-frame
+0 may skip from state 3 directly to gameover 
+3.2/D18.)   
+
+5. **Hit  bug, non- Place an AV tower (damage 1) sokilling** flash 
+   bugs (HP 3) take 2 hits before dying. The bug sprite visibly flips
+   to the "ghost outline" `SPR_BUG_FLASH` for ~3 frames after the
+   first hit, then resumes its A/B walk anim.
+
+6. **Hit   Reach W2; place AV+FW. Same flash on robotrobot** flash 
+   sprites for partial-damage hits.
+
+7. **No flash on killing  Watch a bug die from a hit. Spritehit** 
+   disappears immediately with no inverted-ghost frame.
+
+8. **Flash does not desync walk  Multi-hit a robot 3Anim over a** 
+   path traversal. Flash frames render and clear cleanly; the A/B walk
+   cycle resumes between flashes without obvious skipping.
+
+9. **Tower idle  single  Place one AV tower; idle 60tower** blink 
+   frames. The central LED pixel toggles dark/light ~once per second
+   (32-frame ON, 32-frame OFF).
+
+10. **Tower  4 towers anti- Place an AV tower (slot 0,phase** idle 
+    -10E), another adjacent (slot 1, -10E); kill 1 bug to refund 3E
+    and let 1E/3 s) tick 20E; place slots 2 + 3.to income (
+    Observe ~4 s. LEDs are visibly out-of-phase: slot 0 vs slot 1
+    are exactly anti-phase (one ON while the other OFF, swapping
+    every  0.5 s) per the bitrev4 stagger formula.frames 
+
+11. **Tower idle freezes during  Place a tower, press STARTpause** 
+    to pause, idle 4 s. LED frozen, no BG flicker; resume restores
+    blinking from the same phase-stride.
+
+12. **Tower idle freezes during upgrade  Place a tower; pressmenu** 
+    A on it. LED frozen for the duration the menu is open.
+
+13. **Idle does not break tower place/ Open upgrade menu, SELLsell** 
+    the tower. Tile clears within 1-2 frames (sell-clear preempts
+    idle); no leftover LED pixel painted afterwards.
+
+14. **All-pool  Reach W8+, fill the tower pool untilstress** 
+    `towers_try_place` returns false (16 placements). Idle 10 s. All
+    16 LEDs blink, the pattern shifts each 32-frame half-period, no
+    HUD glitches, no visible BG-write tearing.
+
+15. **HUD + corruption + idle simultaneous ( Best-exploratory)** 
+    effort: place a tower near the path during W3 with HP=2 so the
+    next hit drops HUD HP digit + paints corruption + scans idle on
+    the same frame. Pass = "no visible artefact in 30 s of play".
+    Non-gating.
+
+16. **Build &  `just check` from a clean tree builds, all 5cap** 
+    host tests pass,  32 KB, cart type 0x00.ROM
+
+17. **Hit-flash audio/visual sync (F1 regression check)** —
+    During any wave, allow a tower to hit (but not kill) an enemy.
+    Pass = the white flash sprite is visible on the SAME frame as
+    the SFX_ENEMY_HIT chirp — no perceptible audio-before-visual
+    lag. A regression where the audio plays one frame before the
+    flash appears indicates `enemies_set_flash()` is no longer
+    writing the flash tile immediately (visual would otherwise be
+    delayed by one frame because `enemies_update()` runs before
+    `projectiles_update()` in `playing_update()`). Not host-testable:
+    update ordering plus PPU/audio timing make this a manual-only
+    check. 

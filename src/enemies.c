@@ -1,4 +1,5 @@
 #include "enemies.h"
+#include "enemies_anim.h"
 #include "map.h"
 #include "economy.h"
 #include "assets.h"
@@ -13,6 +14,7 @@ typedef struct {
     u8 type;       /* iter-2: ENEMY_BUG | ENEMY_ROBOT */
     u8 gen;        /* generation counter; bumped on spawn so projectiles can
                     * detect their target slot was reused by a different bug */
+    u8 flash_timer;/* iter-3 #21: frames remaining in hit-flash override */
 } enemy_t;
 
 typedef struct {
@@ -46,6 +48,7 @@ void enemies_init(void) {
         s_enemies[i].alive = 0;
         s_enemies[i].gen = 0;
         s_enemies[i].type = ENEMY_BUG;
+        s_enemies[i].flash_timer = 0;
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
     }
 }
@@ -70,6 +73,7 @@ bool enemies_spawn(u8 type) {
         s_enemies[i].anim = 0;
         s_enemies[i].alive = 1;
         s_enemies[i].type = type;
+        s_enemies[i].flash_timer = 0;
         s_enemies[i].gen++;   /* wraps at 255; collision is astronomical */
         return true;
     }
@@ -88,6 +92,22 @@ u8   enemies_y_px(u8 idx)     { return FIX8_INTU(s_enemies[idx].y); }
 u8   enemies_wp_idx(u8 idx)   { return s_enemies[idx].wp_idx; }
 u8   enemies_gen(u8 idx)      { return s_enemies[idx].gen; }
 u8   enemies_bounty(u8 idx)   { return s_enemy_stats[s_enemies[idx].type].bounty; }
+
+void enemies_set_flash(u8 idx) {
+    if (idx >= MAX_ENEMIES) return;
+    if (!s_enemies[idx].alive) return;
+    s_enemies[idx].flash_timer = FLASH_FRAMES;
+    /* Iter-3 #21 F1: apply flash tile immediately. enemies_update()
+     * runs BEFORE projectiles_update() in playing_update(), so without
+     * this, the flash sprite would only appear next frame — one frame
+     * after the SFX. Writing the tile here syncs visual + audio on the
+     * same frame the hit lands. */
+    {
+        u8 tile = (s_enemies[idx].type == ENEMY_BUG)
+                  ? SPR_BUG_FLASH : SPR_ROBOT_FLASH;
+        set_sprite_tile(OAM_ENEMIES_BASE + idx, tile);
+    }
+}
 
 bool enemies_apply_damage(u8 idx, u8 dmg) {
     if (!s_enemies[idx].alive) return false;
@@ -140,11 +160,20 @@ static void step_enemy(u8 i) {
         e->wp_idx = nxt;
     }
 
-    /* Animate every 16 frames. */
-    e->anim++;
-    u8 frame = (e->anim >> 4) & 1;
-    set_sprite_tile(OAM_ENEMIES_BASE + i,
-        frame ? s_enemy_stats[e->type].spr_b : s_enemy_stats[e->type].spr_a);
+    /* Iter-3 #21: hit-flash sprite override takes precedence over the
+     * walk anim. Timer ticks here (inside step_enemy / enemies_update),
+     * which is already gated by playing_update behind
+     * !game_is_modal_open() — so flash naturally freezes during pause
+     * and the upgrade/sell menu (D16). */
+    u8 tile;
+    if (enemies_flash_step(&e->flash_timer)) {
+        tile = (e->type == ENEMY_BUG) ? SPR_BUG_FLASH : SPR_ROBOT_FLASH;
+    } else {
+        e->anim++;
+        u8 frame = (e->anim >> 4) & 1;
+        tile = frame ? s_enemy_stats[e->type].spr_b : s_enemy_stats[e->type].spr_a;
+    }
+    set_sprite_tile(OAM_ENEMIES_BASE + i, tile);
     /* GB sprite origin: pixel center -> -4 to align top-left of 8x8 tile. */
     u8 sx = FIX8_INTU(e->x) - 4 + 8;
     u8 sy = FIX8_INTU(e->y) - 4 + 16;

@@ -21,7 +21,11 @@
 #define START_ENERGY           30
 #define KILL_BOUNTY             3   /* legacy alias for BUG_BOUNTY */
 #define MAX_ENERGY            255
+/* Iter-2 / iter-3 #20: passive income. */
 #define PASSIVE_INCOME_PERIOD 180   /* +1 energy every 3 s */
+
+/* Iter-3 #21: enemy hit flash duration (frames). 3 ~= 50 ms. */
+#define FLASH_FRAMES     3
 
 /* Enemies ------------------------------------------------------------- */
 #define BUG_HP           3

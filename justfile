@@ -98,6 +98,12 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Isrc \
        tests/test_game_modal.c -o "{{BUILD}}/test_game_modal"
     "{{BUILD}}/test_game_modal"
+    # test_anim exercises the iter-3 #21 pure animation helpers in
+    # src/{map_anim,enemies_anim,towers_anim}.h (header-only, <stdint.h>
+    # only — no GBDK linkage).
+    cc -std=c99 -Wall -Wextra -O2 -Isrc \
+       tests/test_anim.c -o "{{BUILD}}/test_anim"
+    "{{BUILD}}/test_anim"
 
 # Build + launch emulator (one-command playtest)
 #

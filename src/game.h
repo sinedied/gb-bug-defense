@@ -13,4 +13,10 @@ u8   game_get_selected_tower_type(void);   /* iter-2: TOWER_AV | TOWER_FW */
  * open. Add new modals here and update playing_update accordingly. */
 bool game_is_modal_open(void);
 
+/* Iter-3 #21: monotonically-increasing global animation frame counter.
+ * Single source of truth for cross-module animation phase (tower idle
+ * blink today; future ambient anims). Wraps at 256. Reset to 0 on
+ * enter_playing(). Incremented once per game_update(). */
+u8   game_anim_frame(void);
+
 #endif
