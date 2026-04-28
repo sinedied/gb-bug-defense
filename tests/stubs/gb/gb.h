@@ -21,5 +21,6 @@
 /* Forward decls — test binary stubs them with capture logic. */
 void move_sprite(unsigned char nb, unsigned char x, unsigned char y);
 void set_sprite_tile(unsigned char nb, unsigned char tile);
+void set_bkg_tile_xy(unsigned char x, unsigned char y, unsigned char tile);
 
 #endif

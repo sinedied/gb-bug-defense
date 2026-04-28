@@ -24,6 +24,13 @@ typedef uint16_t u16;
 typedef uint8_t  u8;
 
 #include "tuning.h"
+#include "tower_select.h"
+
+/* Iter-3 #18: these live in gtypes.h which pulls <gb/gb.h>. Replicate
+ * them here for host tests; the test_tower_select_cycle assertion below
+ * locks the expected value so drift is caught. */
+enum { ENEMY_BUG = 0, ENEMY_ROBOT = 1, ENEMY_ARMORED = 2, ENEMY_TYPE_COUNT };
+enum { TOWER_AV  = 0, TOWER_FW    = 1, TOWER_EMP = 2, TOWER_TYPE_COUNT };
 
 /* Pre-fix (BUGGY) implementation, kept for regression demonstration. */
 static i16 d2_signed_buggy(u8 ax, u8 ay, u8 bx, u8 by) {
@@ -239,10 +246,11 @@ static void test_tower_stats_lookup(void) {
 }
 
 /* §14 #5: enemy bounty lookup. Pulled from tuning.h. */
-static const u8 ENEMY_BOUNTY[2] = { BUG_BOUNTY, ROBOT_BOUNTY };
+static const u8 ENEMY_BOUNTY[3] = { BUG_BOUNTY, ROBOT_BOUNTY, ARMORED_BOUNTY };
 static void test_enemy_bounty_lookup(void) {
     EXPECT(ENEMY_BOUNTY[0] == 3);
     EXPECT(ENEMY_BOUNTY[1] == 5);
+    EXPECT(ENEMY_BOUNTY[2] == 8);
 }
 
 /* §14 #6: sell-then-place same tile within one frame. Mirrors the
@@ -363,6 +371,24 @@ static void test_audio_state_reset_clears_priority(void) {
     EXPECT(ch[0].prio == 0 || 2 >= ch[0].prio);
 }
 
+/* Iter-3 #18: tower-select cycle via pure header src/tower_select.h. */
+static void test_tower_select_cycle(void) {
+    EXPECT(TOWER_TYPE_COUNT == 3);
+    EXPECT(ENEMY_TYPE_COUNT == 3);
+    EXPECT(tower_select_next(0, 3) == 1);   /* AV -> FW */
+    EXPECT(tower_select_next(1, 3) == 2);   /* FW -> EMP */
+    EXPECT(tower_select_next(2, 3) == 0);   /* EMP -> AV (wrap) */
+    /* Backwards-compat: modulo gives same result as XOR for count=2. */
+    EXPECT(tower_select_next(0, 2) == 1);
+    EXPECT(tower_select_next(1, 2) == 0);
+}
+
+/* Iter-3 #18: EMP sell refund. */
+static void test_emp_sell_refund(void) {
+    EXPECT(sell_refund(TOWER_EMP_COST) == 9);
+    EXPECT(sell_refund(TOWER_EMP_COST + TOWER_EMP_UPG_COST) == 15);  /* 30/2 */
+}
+
 int main(void) {
     test_short_distance_unaffected();
     test_overflow_corner_cases();
@@ -376,6 +402,8 @@ int main(void) {
     test_sell_then_place_same_tile();
     test_dist_squared_extended_range();
     test_audio_state_reset_clears_priority();
+    test_tower_select_cycle();
+    test_emp_sell_refund();
 
     if (failures) {
         fprintf(stderr, "%d test(s) FAILED\n", failures);

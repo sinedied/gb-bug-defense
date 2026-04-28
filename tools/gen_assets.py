@@ -489,6 +489,32 @@ TOWER2_BG_B = design_tile([
     ".######.",
 ])
 
+
+# Iter-3 #18: EMP tower BG tiles. Concentric-ring motif suggests a
+# Tesla coil / capacitor — distinct from satellite dish (AV) and brick
+# wall (FW). TOWER_3_B has a single-pixel LED diff at row 3 col 3
+# ('.' → ',') matching the iter-3 #21 idle-blink convention.
+TOWER3_BG = design_tile([
+    "..o##o..",
+    ".o####o.",
+    "o##oo##o",
+    "##o..o##",
+    "##o..o##",
+    "o##oo##o",
+    ".o####o.",
+    "..o##o..",
+])
+TOWER3_BG_B = design_tile([
+    "..o##o..",
+    ".o####o.",
+    "o##oo##o",
+    "##o,.o##",
+    "##o..o##",
+    "o##oo##o",
+    ".o####o.",
+    "..o##o..",
+])
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -512,6 +538,9 @@ map_tiles = [
     ('TILE_COMP_BR_C3', COMP_BR_C3),
     ('TILE_TOWER_B',    TOWER_BG_B),
     ('TILE_TOWER_2_B',  TOWER2_BG_B),
+    # Iter-3 #18: EMP tower base + idle blink.
+    ('TILE_TOWER_3',    TOWER3_BG),
+    ('TILE_TOWER_3_B',  TOWER3_BG_B),
 ]
 
 # ----------------------------------------------------------------------------
@@ -706,6 +735,76 @@ SPR_ROBOT_FLASH = design_tile([
     ".,,..,,.",
 ])
 
+# Iter-3 #18: Armored bug walk frames. Visually heavier than BUG with a
+# crosshatched metal carapace (#/+ alternating). A/B differ by leg row
+# (same 32-frame walk cadence as bug/robot).
+SPR_ARMORED_A = sprite_from_art([
+    "##.##.##",
+    ".######.",
+    "########",
+    "#+#++#+#",
+    "########",
+    "#+#++#+#",
+    ".######.",
+    "#.#..#.#",
+])
+SPR_ARMORED_B = sprite_from_art([
+    "##.##.##",
+    ".######.",
+    "########",
+    "#+#++#+#",
+    "########",
+    "#+#++#+#",
+    ".######.",
+    ".#.##.#.",
+])
+
+# Iter-3 #18: Armored flash (B→L, D→W inversion of ARMORED_A).
+SPR_ARMORED_FLASH = design_tile([
+    ",,.,,.,,",
+    ".,,,,,,,",
+    ",,,,,,,,",
+    ",.,..,.,",
+    ",,,,,,,,",
+    ",.,..,.,",
+    ".,,,,,,,",
+    ",.,..,.,",
+])
+
+# Iter-3 #18: Stun overlay sprites. Same outline as walk-A frame with
+# light-grey "shock" bands replacing some body pixels so the enemy
+# reads as frozen at a glance. Uses design_tile (.=W, ,=L, o=D, #=B).
+SPR_BUG_STUN = design_tile([
+    "#,#..#,#",
+    ".######.",
+    ".##oo##.",
+    "#,####,#",
+    ".######.",
+    ".#,##,#.",
+    "#.#..#.#",
+    ".......#",
+])
+SPR_ROBOT_STUN = design_tile([
+    "....#...",
+    "..####..",
+    "..#..#..",
+    "..#,,#..",
+    ".######.",
+    ".#,oo,#.",
+    ".#oooo#.",
+    ".##..##.",
+])
+SPR_ARMORED_STUN = design_tile([
+    "##.##.##",
+    ".######.",
+    "########",
+    "#,#oo#,#",
+    "########",
+    "#,#oo#,#",
+    ".######.",
+    "#.#..#.#",
+])
+
 sprite_tiles = [
     ('SPR_CURSOR_A',    SPR_CURSOR_A),
     ('SPR_CURSOR_B',    SPR_CURSOR_B),
@@ -744,6 +843,13 @@ sprite_tiles = [
     ('SPR_GLYPH_T',     SPR_GLYPH_T),
     ('SPR_BUG_FLASH',   SPR_BUG_FLASH),
     ('SPR_ROBOT_FLASH', SPR_ROBOT_FLASH),
+    # Iter-3 #18: armored walk/flash + stun overlays (3 per enemy type).
+    ('SPR_ARMORED_A',     SPR_ARMORED_A),
+    ('SPR_ARMORED_B',     SPR_ARMORED_B),
+    ('SPR_ARMORED_FLASH', SPR_ARMORED_FLASH),
+    ('SPR_BUG_STUN',      SPR_BUG_STUN),
+    ('SPR_ROBOT_STUN',    SPR_ROBOT_STUN),
+    ('SPR_ARMORED_STUN',  SPR_ARMORED_STUN),
 ]
 
 # ----------------------------------------------------------------------------
@@ -909,7 +1015,9 @@ assets_h = """\
 #define TILE_COMP_BR_C3 (MAP_TILE_BASE + 18)
 #define TILE_TOWER_B    (MAP_TILE_BASE + 19)
 #define TILE_TOWER_2_B  (MAP_TILE_BASE + 20)
-#define MAP_TILE_COUNT  21
+#define TILE_TOWER_3    (MAP_TILE_BASE + 21)
+#define TILE_TOWER_3_B  (MAP_TILE_BASE + 22)
+#define MAP_TILE_COUNT  23
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1
@@ -948,7 +1056,13 @@ assets_h = """\
 #define SPR_GLYPH_T     34
 #define SPR_BUG_FLASH   35
 #define SPR_ROBOT_FLASH 36
-#define SPRITE_TILE_COUNT 37
+#define SPR_ARMORED_A     37
+#define SPR_ARMORED_B     38
+#define SPR_ARMORED_FLASH 39
+#define SPR_BUG_STUN      40
+#define SPR_ROBOT_STUN    41
+#define SPR_ARMORED_STUN  42
+#define SPRITE_TILE_COUNT 43
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

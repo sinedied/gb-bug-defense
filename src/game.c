@@ -16,6 +16,7 @@
 #include "menu.h"
 #include "pause.h"
 #include "game_modal.h"
+#include "tower_select.h"
 #include <gb/gb.h>
 
 enum { GS_TITLE, GS_PLAYING, GS_WIN, GS_LOSE };
@@ -102,7 +103,7 @@ void game_init(void) {
 }
 
 static void cycle_tower_type(void) {
-    s_selected_type ^= 1;
+    s_selected_type = tower_select_next(s_selected_type, TOWER_TYPE_COUNT);
     hud_mark_t_dirty();
 }
 

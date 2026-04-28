@@ -67,6 +67,12 @@ static const sfx_def_t S_SFX[SFX_COUNT] = {
         .channel = 2, .priority = 1, .nrx1 = 0x80, .envelope = 0xF0,
         .duration = 12, .pitch = 0x0700,
     },
+    [SFX_EMP_FIRE] = {
+        /* Iter-3 #18: descending square sweep, distinct from PLACE (shorter
+         * duration=8 vs 16). CH1 prio=2, does not conflict with music CH4. */
+        .channel = 1, .priority = 2, .nrx1 = 0x80, .envelope = 0xF1,
+        .duration = 8, .sweep = 0x73, .pitch = 0x07A0,
+    },
 };
 
 typedef struct {

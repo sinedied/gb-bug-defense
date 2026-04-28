@@ -119,6 +119,15 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Isrc \
        tests/test_difficulty.c -o "{{BUILD}}/test_difficulty"
     "{{BUILD}}/test_difficulty"
+    # test_enemies exercises iter-3 #18 stun API + flash>stun>walk priority.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc -Ires \
+       tests/test_enemies.c src/enemies.c -o "{{BUILD}}/test_enemies"
+    "{{BUILD}}/test_enemies"
+    # test_towers exercises iter-3 #18 EMP tower: kind discriminator,
+    # AoE stun scan, cooldown-on-success, freshly-placed cooldown=0.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc -Ires \
+       tests/test_towers.c src/towers.c -o "{{BUILD}}/test_towers"
+    "{{BUILD}}/test_towers"
 
 # Build + launch emulator (one-command playtest)
 #

@@ -172,12 +172,24 @@ static void test_reset_preserves_master_regs(void) {
     CHECK((g_audio_regs[REG_NR12] & 0xF0) != 0);
 }
 
+/* Iter-3 #18: SFX_EMP_FIRE is on CH1 and doesn't interfere with music. */
+static void test_emp_fire_sfx_channel(void) {
+    reset_regs();
+    audio_play(SFX_EMP_FIRE);
+    /* CH1 registers NR10-NR14 should have been written. */
+    CHECK(g_audio_regs[REG_NR10] != 0);  /* sweep byte */
+    CHECK((g_audio_regs[REG_NR12] & 0xF0) != 0);  /* DAC on */
+    /* NR14 bit 7 = trigger */
+    CHECK(g_audio_regs[REG_NR14] & 0x80);
+}
+
 int main(void) {
     test_init_writes_nr52_first_and_fires_boot_chime();
     test_play_sets_priority_and_envelope();
     test_priority_preempt_rules();
     test_tick_silences_single_note_sfx();
     test_reset_preserves_master_regs();
+    test_emp_fire_sfx_channel();
     if (failures) {
         fprintf(stderr, "test_audio: %d failure(s)\n", failures);
         return 1;

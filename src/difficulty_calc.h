@@ -14,15 +14,15 @@
 
 enum { DIFF_EASY = 0, DIFF_NORMAL = 1, DIFF_HARD = 2, DIFF_COUNT = 3 };
 
-/* Per-(difficulty, enemy-type) HP table — 6 bytes ROM. Indexed
+/* Per-(difficulty, enemy-type) HP table — 9 bytes ROM. Indexed
  * [difficulty][enemy_type]; order matches DIFF_* and ENEMY_*. The NORMAL
- * row uses BUG_HP / ROBOT_HP symbolically so any future drift in
- * `tuning.h` produces a compile-time identity (T1 in test_difficulty
- * keeps it as defense in depth). */
-static const uint8_t DIFF_ENEMY_HP[3][2] = {
-    /* EASY   */ { 2, 4 },
-    /* NORMAL */ { BUG_HP, ROBOT_HP },
-    /* HARD   */ { 5, 9 },
+ * row uses BUG_HP / ROBOT_HP / ARMORED_HP symbolically so any future
+ * drift in `tuning.h` produces a compile-time identity (T1 in
+ * test_difficulty keeps it as defense in depth). */
+static const uint8_t DIFF_ENEMY_HP[3][3] = {
+    /* EASY   */ { 2, 4, 8 },
+    /* NORMAL */ { BUG_HP, ROBOT_HP, ARMORED_HP },
+    /* HARD   */ { 5, 9, 16 },
 };
 
 /* Spawn-interval scaler: result = max(floor, (base * num) >> 3).
@@ -39,7 +39,7 @@ static const uint8_t DIFF_ENEMY_HP[3][2] = {
 
 static inline uint8_t difficulty_enemy_hp(uint8_t enemy_type, uint8_t diff) {
     if (diff >= 3) diff = 1;            /* clamp to NORMAL on garbage */
-    if (enemy_type >= 2) enemy_type = 0;
+    if (enemy_type >= 3) enemy_type = 0;
     return DIFF_ENEMY_HP[diff][enemy_type];
 }
 

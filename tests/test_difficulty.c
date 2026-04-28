@@ -31,14 +31,17 @@ static int failures = 0;
 static void test_t1_normal_identity(void) {
     CHECK_EQ(difficulty_enemy_hp(0, DIFF_NORMAL), BUG_HP);
     CHECK_EQ(difficulty_enemy_hp(1, DIFF_NORMAL), ROBOT_HP);
+    CHECK_EQ(difficulty_enemy_hp(2, DIFF_NORMAL), ARMORED_HP);
 }
 
-/* T2 — Exact HP scaling values for EASY (2,4) and HARD (5,9). */
+/* T2 — Exact HP scaling values for EASY and HARD (all 3 types). */
 static void test_t2_easy_hard_values(void) {
     CHECK_EQ(difficulty_enemy_hp(0, DIFF_EASY), 2);
     CHECK_EQ(difficulty_enemy_hp(1, DIFF_EASY), 4);
+    CHECK_EQ(difficulty_enemy_hp(2, DIFF_EASY), 8);
     CHECK_EQ(difficulty_enemy_hp(0, DIFF_HARD), 5);
     CHECK_EQ(difficulty_enemy_hp(1, DIFF_HARD), 9);
+    CHECK_EQ(difficulty_enemy_hp(2, DIFF_HARD), 16);
 }
 
 /* T3 — Junk inputs clamp to NORMAL row / bug column. */
@@ -46,6 +49,9 @@ static void test_t3_clamp(void) {
     CHECK_EQ(difficulty_enemy_hp(99, 99), DIFF_ENEMY_HP[1][0]);
     CHECK_EQ(difficulty_enemy_hp(99, DIFF_HARD), DIFF_ENEMY_HP[2][0]);
     CHECK_EQ(difficulty_enemy_hp(0, 7), DIFF_ENEMY_HP[1][0]);
+    /* Armored (type 2) is now valid — clamp at >= 3. */
+    CHECK_EQ(difficulty_enemy_hp(2, DIFF_NORMAL), ARMORED_HP);
+    CHECK_EQ(difficulty_enemy_hp(3, DIFF_NORMAL), DIFF_ENEMY_HP[1][0]);
 }
 
 /* T4 — Spawn interval identity for NORMAL across every base used in
@@ -105,7 +111,7 @@ static void test_t8_cycle(void) {
 /* T9 — No zero-HP enemy can ever spawn. */
 static void test_t9_hp_floor(void) {
     for (unsigned d = 0; d < DIFF_COUNT; d++) {
-        for (unsigned t = 0; t < 2; t++) {
+        for (unsigned t = 0; t < 3; t++) {
             CHECK(DIFF_ENEMY_HP[d][t] >= 1);
         }
     }

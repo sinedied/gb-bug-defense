@@ -3,16 +3,23 @@
 
 #include "gtypes.h"
 
+/* Iter-3 #18: kind discriminator for tower behavior dispatch. */
+enum { TKIND_DAMAGE = 0, TKIND_STUN = 1 };
+
 typedef struct {
     u8  cost;
     u8  upgrade_cost;
     u8  cooldown;       /* level 0 */
     u8  cooldown_l1;
-    u8  damage;
-    u8  damage_l1;
+    u8  damage;         /* only for TKIND_DAMAGE */
+    u8  damage_l1;      /* only for TKIND_DAMAGE */
     u8  range_px;       /* level-independent */
-    u8  bg_tile;        /* TILE_TOWER or TILE_TOWER_2 */
-    u8  hud_letter;     /* 'A' or 'F' */
+    u8  bg_tile;        /* TILE_TOWER / TILE_TOWER_2 / TILE_TOWER_3 */
+    u8  bg_tile_alt;    /* idle-blink tile per type (iter-3 #18) */
+    u8  hud_letter;     /* 'A', 'F', or 'E' */
+    u8  kind;           /* TKIND_DAMAGE or TKIND_STUN */
+    u8  stun_frames;    /* only for TKIND_STUN — level 0 */
+    u8  stun_frames_l1; /* only for TKIND_STUN — level 1 */
 } tower_stats_t;
 
 void towers_init(void);

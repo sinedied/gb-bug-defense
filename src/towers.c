@@ -20,7 +20,7 @@ typedef struct {
     u8 cooldown;
     u8 alive;
     u8 dirty;       /* needs BG tile write next render */
-    u8 type;        /* TOWER_AV | TOWER_FW */
+    u8 type;        /* TOWER_AV | TOWER_FW | TOWER_EMP */
     u8 level;       /* 0 | 1 */
     u8 spent;       /* cumulative energy spent (cost + any upgrade) */
     u8 idle_phase;  /* iter-3 #21: last-painted LED phase (0 or 1) */
@@ -34,14 +34,27 @@ static const tower_stats_t s_tower_stats[TOWER_TYPE_COUNT] = {
         .cooldown = TOWER_AV_COOLDOWN, .cooldown_l1 = TOWER_AV_COOLDOWN_L1,
         .damage = TOWER_AV_DAMAGE, .damage_l1 = TOWER_AV_DAMAGE_L1,
         .range_px = TOWER_AV_RANGE_PX,
-        .bg_tile = TILE_TOWER, .hud_letter = 'A',
+        .bg_tile = TILE_TOWER, .bg_tile_alt = TILE_TOWER_B,
+        .hud_letter = 'A', .kind = TKIND_DAMAGE,
+        .stun_frames = 0, .stun_frames_l1 = 0,
     },
     /* FW */ {
         .cost = TOWER_FW_COST, .upgrade_cost = TOWER_FW_UPG_COST,
         .cooldown = TOWER_FW_COOLDOWN, .cooldown_l1 = TOWER_FW_COOLDOWN_L1,
         .damage = TOWER_FW_DAMAGE, .damage_l1 = TOWER_FW_DAMAGE_L1,
         .range_px = TOWER_FW_RANGE_PX,
-        .bg_tile = TILE_TOWER_2, .hud_letter = 'F',
+        .bg_tile = TILE_TOWER_2, .bg_tile_alt = TILE_TOWER_2_B,
+        .hud_letter = 'F', .kind = TKIND_DAMAGE,
+        .stun_frames = 0, .stun_frames_l1 = 0,
+    },
+    /* EMP */ {
+        .cost = TOWER_EMP_COST, .upgrade_cost = TOWER_EMP_UPG_COST,
+        .cooldown = TOWER_EMP_COOLDOWN, .cooldown_l1 = TOWER_EMP_COOLDOWN_L1,
+        .damage = 0, .damage_l1 = 0,
+        .range_px = TOWER_EMP_RANGE_PX,
+        .bg_tile = TILE_TOWER_3, .bg_tile_alt = TILE_TOWER_3_B,
+        .hud_letter = 'E', .kind = TKIND_STUN,
+        .stun_frames = TOWER_EMP_STUN, .stun_frames_l1 = TOWER_EMP_STUN_L1,
     },
 };
 
@@ -117,6 +130,14 @@ bool towers_try_place(u8 tx, u8 ty, u8 type) {
     s_towers[slot].level = 0;
     s_towers[slot].spent = cost;
     s_towers[slot].cooldown = s_tower_stats[type].cooldown;
+    /* Iter-3 #18 F3: freshly-placed EMP starts with cooldown=1 (not 0).
+     * Reason: SFX_TOWER_PLACE plays this frame on CH1 (prio=2). If the EMP
+     * also fires same-frame, SFX_EMP_FIRE (also CH1, prio=2) preempts it
+     * via the equal-priority rule, suppressing placement audio. Deferring
+     * the first pulse by 1 frame (~16 ms, imperceptible) lets the place
+     * SFX play cleanly while preserving "stuns near-immediately on placement". */
+    if (s_tower_stats[type].kind == TKIND_STUN)
+        s_towers[slot].cooldown = 1;
     s_towers[slot].alive = 1;
     s_towers[slot].dirty = 1;
     s_towers[slot].idle_phase = 0;   /* matches the about-to-be-painted base tile */
@@ -141,8 +162,15 @@ bool towers_upgrade(u8 idx) {
     if (!economy_try_spend(cost)) return false;
     s_towers[idx].level = 1;
     s_towers[idx].spent += cost;
-    /* Reset cooldown to L1 cadence so the change is immediately observable. */
-    s_towers[idx].cooldown = s_tower_stats[s_towers[idx].type].cooldown_l1;
+    /* Iter-3 #18 F2: only damage towers reset cooldown on upgrade.
+     * EMP (TKIND_STUN) preserves its current cooldown — its L0/L1 cadences
+     * are identical (120), so resetting would force an idle EMP at
+     * cooldown=0 into a 120-frame dead window, violating the
+     * cooldown-on-success invariant (D-IT3-18-7). */
+    const tower_stats_t *st = s_tower_stats + s_towers[idx].type;
+    if (st->kind == TKIND_DAMAGE) {
+        s_towers[idx].cooldown = st->cooldown_l1;
+    }
     audio_play(SFX_TOWER_PLACE);
     return true;
 }
@@ -200,8 +228,7 @@ void towers_render(void) {
         u8 want = towers_idle_phase_for(cur_frame, i);
         if (want == s_towers[i].idle_phase) continue;
         u8 base = s_tower_stats[s_towers[i].type].bg_tile;
-        u8 alt  = (s_towers[i].type == TOWER_AV)
-                  ? (u8)TILE_TOWER_B : (u8)TILE_TOWER_2_B;
+        u8 alt  = s_tower_stats[s_towers[i].type].bg_tile_alt;
         set_bkg_tile_xy(s_towers[i].tx,
                         s_towers[i].ty + HUD_ROWS,
                         want ? alt : base);
@@ -246,11 +273,52 @@ void towers_update(void) {
         u8 cx = s_towers[i].tx * 8 + 4;
         u8 cy = (s_towers[i].ty + HUD_ROWS) * 8 + 4;
         u16 range_sq = (u16)st->range_px * (u16)st->range_px;
-        u8 t = acquire_target(cx, cy, range_sq);
-        if (t == 0xFF) continue;
-        u8 dmg = s_towers[i].level ? st->damage_l1 : st->damage;
-        if (projectiles_fire(FIX8(cx), FIX8(cy), t, dmg)) {
-            s_towers[i].cooldown = s_towers[i].level ? st->cooldown_l1 : st->cooldown;
+
+        if (st->kind == TKIND_STUN) {
+            /* Iter-3 #18 F1: 3-outcome cooldown rule prevents overlapping-EMP
+             * perma-freeze. (a) any_stunned → reset cooldown + SFX.
+             * (b) found_target but all already stunned by another EMP →
+             * burn cooldown silently (no SFX). Without this, a 2nd EMP
+             * polling at cooldown=0 every frame would always grab the
+             * unstun frame on its rival's expiry and chain-lock the
+             * enemy forever (towers_update runs before enemies_update).
+             * (c) no targets in range → keep cooldown=0, retry next frame. */
+            bool any_stunned = false;
+            bool found_target = false;
+            u8 stun_dur = s_towers[i].level
+                          ? st->stun_frames_l1 : st->stun_frames;
+            u8 j;
+            for (j = 0; j < MAX_ENEMIES; j++) {
+                if (!enemies_alive(j)) continue;
+                i16 dx = (i16)enemies_x_px(j) - (i16)cx;
+                i16 dy = (i16)enemies_y_px(j) - (i16)cy;
+                u16 adx = dx < 0 ? (u16)-dx : (u16)dx;
+                u16 ady = dy < 0 ? (u16)-dy : (u16)dy;
+                u16 d2 = adx * adx + ady * ady;
+                if (d2 > range_sq) continue;
+                found_target = true;
+                if (enemies_try_stun(j, stun_dur))
+                    any_stunned = true;
+            }
+            if (any_stunned) {
+                audio_play(SFX_EMP_FIRE);
+                s_towers[i].cooldown = s_towers[i].level
+                                       ? st->cooldown_l1 : st->cooldown;
+            } else if (found_target) {
+                /* All targets already stunned — burn cooldown, no SFX. */
+                s_towers[i].cooldown = s_towers[i].level
+                                       ? st->cooldown_l1 : st->cooldown;
+            }
+            /* else: empty range — keep cooldown=0, re-scan next frame. */
+        } else {
+            /* TKIND_DAMAGE: acquire nearest, fire projectile. */
+            u8 t = acquire_target(cx, cy, range_sq);
+            if (t == 0xFF) continue;
+            u8 dmg = s_towers[i].level ? st->damage_l1 : st->damage;
+            if (projectiles_fire(FIX8(cx), FIX8(cy), t, dmg)) {
+                s_towers[i].cooldown = s_towers[i].level
+                                       ? st->cooldown_l1 : st->cooldown;
+            }
         }
     }
 }

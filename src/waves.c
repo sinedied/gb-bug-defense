@@ -18,6 +18,7 @@ typedef struct {
 
 #define B ENEMY_BUG
 #define R ENEMY_ROBOT
+#define A ENEMY_ARMORED
 
 /* W1: 5 bugs @ 90 f */
 static const spawn_event_t W1_EV[] = {
@@ -48,15 +49,16 @@ static const spawn_event_t W6_EV[] = {
     {R,50},{R,50},{B,50},{B,50},{B,50},{B,50},{B,50},{B,50},
     {R,50},{R,50},{B,50},{B,50},{B,50},{B,50},{B,50},{B,50}
 };
-/* W7: (R,R,B) × 4, R, R   (interval 50 f, count 14) */
+/* W7: (R,R,B) × 4, R, R + 1 armored   (count 15) */
 static const spawn_event_t W7_EV[] = {
     {R,50},{R,50},{B,50},
     {R,50},{R,50},{B,50},
     {R,50},{R,50},{B,50},
     {R,50},{R,50},{B,50},
-    {R,50},{R,50}
+    {R,50},{R,50},
+    {A,90}
 };
-/* W8: (B,B,R) × 6, B, B   (interval 50 f, count 20)  -> 14B + 6R */
+/* W8: (B,B,R) × 6, B, B + 1 armored   (count 21) */
 static const spawn_event_t W8_EV[] = {
     {B,50},{B,50},{R,50},
     {B,50},{B,50},{R,50},
@@ -64,21 +66,24 @@ static const spawn_event_t W8_EV[] = {
     {B,50},{B,50},{R,50},
     {B,50},{B,50},{R,50},
     {B,50},{B,50},{R,50},
-    {B,50},{B,50}
+    {B,50},{B,50},
+    {A,90}
 };
-/* W9: strict alternating B,R × 10   (interval 50 f, count 20) */
+/* W9: strict alternating B,R × 10 + 2 armored   (count 22) */
 static const spawn_event_t W9_EV[] = {
     {B,50},{R,50},{B,50},{R,50},{B,50},{R,50},{B,50},{R,50},{B,50},{R,50},
-    {B,50},{R,50},{B,50},{R,50},{B,50},{R,50},{B,50},{R,50},{B,50},{R,50}
+    {B,50},{R,50},{B,50},{R,50},{B,50},{R,50},{B,50},{R,50},{B,50},{R,50},
+    {A,80},{A,80}
 };
-/* W10: R×4, B×6, R×4, B×6, R×4, B×4   (interval 50 f, count 28)  -> 16B + 12R */
+/* W10: R×4, B×6, R×4, B×6, R×4, B×4 + 3 armored   (count 31) */
 static const spawn_event_t W10_EV[] = {
     {R,50},{R,50},{R,50},{R,50},
     {B,50},{B,50},{B,50},{B,50},{B,50},{B,50},
     {R,50},{R,50},{R,50},{R,50},
     {B,50},{B,50},{B,50},{B,50},{B,50},{B,50},
     {R,50},{R,50},{R,50},{R,50},
-    {B,50},{B,50},{B,50},{B,50}
+    {B,50},{B,50},{B,50},{B,50},
+    {A,75},{A,75},{A,75}
 };
 
 static const wave_t s_waves[MAX_WAVES] = {
@@ -88,14 +93,15 @@ static const wave_t s_waves[MAX_WAVES] = {
     { W4_EV, 12, 180 },
     { W5_EV, 12, 180 },
     { W6_EV, 16, 180 },
-    { W7_EV, 14, 180 },
-    { W8_EV, 20, 180 },
-    { W9_EV, 20, 240 },
-    { W10_EV,28, 0   },
+    { W7_EV, 15, 180 },
+    { W8_EV, 21, 180 },
+    { W9_EV, 22, 240 },
+    { W10_EV,31, 0   },
 };
 
 #undef B
 #undef R
+#undef A
 
 enum { WS_DELAY, WS_SPAWNING, WS_DONE };
 

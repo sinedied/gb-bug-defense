@@ -23,4 +23,11 @@ bool enemies_apply_damage(u8 idx, u8 dmg);
 /* Iter-3 #21: arm 3-frame hit-flash sprite override on a non-killing hit. */
 void enemies_set_flash(u8 idx);
 
+/* Iter-3 #18: stun API — enemy_t stays private to enemies.c.
+ * enemies_try_stun: returns true and sets stun_timer iff alive and not
+ *   already stunned (stun_timer == 0). False otherwise (no-stack).
+ * enemies_is_stunned: read-only accessor for host tests. */
+bool enemies_try_stun(u8 idx, u8 frames);
+bool enemies_is_stunned(u8 idx);
+
 #endif

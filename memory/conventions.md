@@ -162,3 +162,25 @@ Predicates that decide modal precedence / cross-modal gating belong in a header-
   via the same `_NR_LOG` macro and `_AUD3WAVERAM` as a 16-byte global
   array (`g_wave_ram`) so wave-RAM writes are observable from host
   tests.
+
+### Tower stats kind discriminator (iter-3 #18)
+Each row in s_tower_stats[] declares `kind`:
+  - TKIND_DAMAGE: reads .damage / .damage_l1 / .cooldown / .cooldown_l1, fires projectiles via projectiles_fire().
+  - TKIND_STUN: reads .stun_frames / .stun_frames_l1 / .cooldown / .cooldown_l1, calls enemies_try_stun() (no projectile).
+The unused field group is  do NOT cross-read.irrelevant 
+
+### Enemy sprite-tile priority (iter-3 #18)
+In step_enemy(), pick the sprite tile in this priority order:
+ SPR_*_FLASH (3-frame override; per iter-3 #21)
+ SPR_*_STUN  (movement also skipped)
+ walk frame A/B by (anim >> 4) & 1
+flash_timer and stun_timer both decrement every frame regardless of which one wins the tile slot. e->anim only increments on the walk branch.
+
+### Tower-select cycle: pure helper in tower_select.h (iter-3 #18)
+The B-button handler in game.c calls tower_select_next(cur, TOWER_TYPE_COUNT) from the pure header src/tower_select.h. Adding a new tower requires NO change to this code; the new type joins the cycle automatically. The pure header keeps host tests in test_math.c free of game-source dependencies.
+
+### Stun encapsulation: enemies_try_stun() / enemies_is_stunned() (iter-3 #18)
+enemy_t (including stun_timer) is private to enemies.c. Stun-applying code (currently towers.c, future projectile-stuns, debuffs, etc.) MUST go through the public APIs:
+  - bool enemies_try_stun(u8 idx, u8 frames)  — returns true and sets timer iff alive and not already stunned
+  - bool enemies_is_stunned(u8 idx)           — read-only
+Direct enemy_t access from outside enemies.c is forbidden.

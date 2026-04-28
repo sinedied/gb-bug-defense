@@ -13,10 +13,11 @@ typedef struct {
     u8 wp_idx;
     u8 anim;
     u8 alive;
-    u8 type;       /* iter-2: ENEMY_BUG | ENEMY_ROBOT */
+    u8 type;       /* iter-2: ENEMY_BUG | ENEMY_ROBOT | ENEMY_ARMORED */
     u8 gen;        /* generation counter; bumped on spawn so projectiles can
                     * detect their target slot was reused by a different bug */
     u8 flash_timer;/* iter-3 #21: frames remaining in hit-flash override */
+    u8 stun_timer; /* iter-3 #18: frames remaining in stun (0 = not stunned) */
 } enemy_t;
 
 typedef struct {
@@ -28,8 +29,9 @@ typedef struct {
 } enemy_stats_t;
 
 static const enemy_stats_t s_enemy_stats[ENEMY_TYPE_COUNT] = {
-    { BUG_HP,   BUG_SPEED,   BUG_BOUNTY,   SPR_BUG_A,   SPR_BUG_B   },
-    { ROBOT_HP, ROBOT_SPEED, ROBOT_BOUNTY, SPR_ROBOT_A, SPR_ROBOT_B },
+    { BUG_HP,     BUG_SPEED,     BUG_BOUNTY,     SPR_BUG_A,     SPR_BUG_B     },
+    { ROBOT_HP,   ROBOT_SPEED,   ROBOT_BOUNTY,   SPR_ROBOT_A,   SPR_ROBOT_B   },
+    { ARMORED_HP, ARMORED_SPEED, ARMORED_BOUNTY, SPR_ARMORED_A, SPR_ARMORED_B },
 };
 
 static enemy_t s_enemies[MAX_ENEMIES];
@@ -51,6 +53,7 @@ void enemies_init(void) {
         s_enemies[i].gen = 0;
         s_enemies[i].type = ENEMY_BUG;
         s_enemies[i].flash_timer = 0;
+        s_enemies[i].stun_timer = 0;
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
     }
 }
@@ -76,6 +79,7 @@ bool enemies_spawn(u8 type) {
         s_enemies[i].alive = 1;
         s_enemies[i].type = type;
         s_enemies[i].flash_timer = 0;
+        s_enemies[i].stun_timer = 0;
         s_enemies[i].gen++;   /* wraps at 255; collision is astronomical */
         return true;
     }
@@ -105,10 +109,29 @@ void enemies_set_flash(u8 idx) {
      * after the SFX. Writing the tile here syncs visual + audio on the
      * same frame the hit lands. */
     {
-        u8 tile = (s_enemies[idx].type == ENEMY_BUG)
-                  ? SPR_BUG_FLASH : SPR_ROBOT_FLASH;
+        u8 tile;
+        if (s_enemies[idx].type == ENEMY_BUG)
+            tile = SPR_BUG_FLASH;
+        else if (s_enemies[idx].type == ENEMY_ROBOT)
+            tile = SPR_ROBOT_FLASH;
+        else
+            tile = SPR_ARMORED_FLASH;
         set_sprite_tile(OAM_ENEMIES_BASE + idx, tile);
     }
+}
+
+bool enemies_try_stun(u8 idx, u8 frames) {
+    if (idx >= MAX_ENEMIES) return false;
+    if (!s_enemies[idx].alive) return false;
+    if (s_enemies[idx].stun_timer != 0) return false;  /* no-stack */
+    s_enemies[idx].stun_timer = frames;
+    return true;
+}
+
+bool enemies_is_stunned(u8 idx) {
+    if (idx >= MAX_ENEMIES) return false;
+    if (!s_enemies[idx].alive) return false;
+    return s_enemies[idx].stun_timer != 0;
 }
 
 bool enemies_apply_damage(u8 idx, u8 dmg) {
@@ -136,41 +159,64 @@ static void step_enemy(u8 i) {
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
         return;
     }
-    fix8 tx = wp_x_fix(wps[nxt].tx);
-    fix8 ty = wp_y_fix(wps[nxt].ty);
 
-    /* Path is axis-aligned; move along the dominant axis. */
-    i16 ddx = tx - e->x;
-    i16 ddy = ty - e->y;
-    fix8 step = s_enemy_stats[e->type].speed;
+    /* Iter-3 #18: skip movement when stunned. */
+    if (e->stun_timer == 0) {
+        fix8 tx = wp_x_fix(wps[nxt].tx);
+        fix8 ty = wp_y_fix(wps[nxt].ty);
 
-    if (ddx > 0) {
-        if (ddx <= step) { e->x = tx; }
-        else             { e->x += step; }
-    } else if (ddx < 0) {
-        if (-ddx <= step) { e->x = tx; }
-        else              { e->x -= step; }
-    } else if (ddy > 0) {
-        if (ddy <= step) { e->y = ty; }
-        else             { e->y += step; }
-    } else if (ddy < 0) {
-        if (-ddy <= step) { e->y = ty; }
-        else              { e->y -= step; }
+        /* Path is axis-aligned; move along the dominant axis. */
+        i16 ddx = tx - e->x;
+        i16 ddy = ty - e->y;
+        fix8 step = s_enemy_stats[e->type].speed;
+
+        if (ddx > 0) {
+            if (ddx <= step) { e->x = tx; }
+            else             { e->x += step; }
+        } else if (ddx < 0) {
+            if (-ddx <= step) { e->x = tx; }
+            else              { e->x -= step; }
+        } else if (ddy > 0) {
+            if (ddy <= step) { e->y = ty; }
+            else             { e->y += step; }
+        } else if (ddy < 0) {
+            if (-ddy <= step) { e->y = ty; }
+            else              { e->y -= step; }
+        }
+
+        if (e->x == tx && e->y == ty) {
+            e->wp_idx = nxt;
+        }
     }
 
-    if (e->x == tx && e->y == ty) {
-        e->wp_idx = nxt;
-    }
-
-    /* Iter-3 #21: hit-flash sprite override takes precedence over the
-     * walk anim. Timer ticks here (inside step_enemy / enemies_update),
-     * which is already gated by playing_update behind
-     * !game_is_modal_open() — so flash naturally freezes during pause
-     * and the upgrade/sell menu (D16). */
+    /* Iter-3 #18 + #21: sprite tile priority — flash > stun > walk.
+     * Snapshot stun state before any decrement so movement skip and tile
+     * pick use the same truth value. Both timers decrement every frame
+     * regardless of which tile wins the slot. e->anim only increments
+     * on the walk branch. */
+    u8 was_stunned = (e->stun_timer > 0);
+    u8 had_flash = enemies_flash_step(&e->flash_timer);
+    if (e->stun_timer) e->stun_timer--;  /* always tick, independent of flash */
     u8 tile;
-    if (enemies_flash_step(&e->flash_timer)) {
-        tile = (e->type == ENEMY_BUG) ? SPR_BUG_FLASH : SPR_ROBOT_FLASH;
+    if (had_flash) {
+        /* Priority 1: flash (3-frame hit feedback). */
+        if (e->type == ENEMY_BUG)
+            tile = SPR_BUG_FLASH;
+        else if (e->type == ENEMY_ROBOT)
+            tile = SPR_ROBOT_FLASH;
+        else
+            tile = SPR_ARMORED_FLASH;
+    } else if (was_stunned) {
+        /* Priority 2: stun (frozen visual). Uses pre-dec snapshot so the
+         * stun tile shows for the full duration. */
+        if (e->type == ENEMY_BUG)
+            tile = SPR_BUG_STUN;
+        else if (e->type == ENEMY_ROBOT)
+            tile = SPR_ROBOT_STUN;
+        else
+            tile = SPR_ARMORED_STUN;
     } else {
+        /* Priority 3: normal walk animation. */
         e->anim++;
         u8 frame = (e->anim >> 4) & 1;
         tile = frame ? s_enemy_stats[e->type].spr_b : s_enemy_stats[e->type].spr_a;

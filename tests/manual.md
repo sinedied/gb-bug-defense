@@ -439,3 +439,105 @@ DMG / mGBA). Run them after any change to `src/music.c` or
 3. Expected: no  there is always at least one tick of silenceclick 
    between the SFX envelope ending and the next music percussion
    trigger.
+
+---
+
+## Iter-3 #18: Third enemy (Armored) + Third tower (EMP)
+
+### Scenario 1: Tower cycle wraps to 3
+1. New game. On the play screen, press B three times. Watch HUD col 19.
+2. **Expected**: Letter cycles `A → F → E → A`.
+
+### Scenario 2: Place EMP, no error
+1. New game. Cycle to `E`. Move cursor to a buildable tile. Press A.
+2. **Expected**: EMP tower BG tile appears; energy decreases by 18.
+   `SFX_TOWER_PLACE` plays.
+
+### Scenario 3: EMP stuns enemies in range
+1. Apply Setup (5) from spec. At W3 spawn, place EMP within 16 px of
+   the path. Watch a bug walk into range.
+2. **Expected**: Bug visibly **stops** moving for ~60 frames (~1 s),
+   shows `SPR_BUG_STUN` tile, then resumes walking. `SFX_EMP_FIRE`
+   plays at the moment of stun.
+
+### Scenario 4: EMP is AoE
+1. Apply Setup (5). At W6, place EMP at a path bend so 2+ enemies
+   are within 16 px when it fires.
+2. **Expected**: All enemies within 16 px stun simultaneously on the
+   same frame.
+
+### Scenario 5: EMP cooldown
+1. Continuation of scenario 3 (do not reset). After a successful
+   pulse, watch the same EMP.
+2. **Expected**: The same enemy is **not** re-stunned mid-stun; after
+   its `stun_timer` expires it walks; the EMP fires again only after
+   120 frames have elapsed since the previous successful pulse.
+
+### Scenario 6: Freshly-placed EMP stuns immediately
+1. Apply Setup (5). Pause when a bug is at a known tile. Unpause and
+   immediately place EMP adjacent so the bug is within 16 px.
+2. **Expected**: The bug stuns on the **same** frame the tower appears
+   (no 120-frame placement delay). After the pulse, normal 120-frame
+   cooldown applies. If placed with an empty range, cooldown stays at
+   0 and the next entering enemy stuns immediately.
+
+### Scenario 7: Upgrade EMP → longer stun
+1. Continuation of scenario 3. Open menu on the EMP, choose UPG
+   (cost 12). Watch the next pulse.
+2. **Expected**: Stun visibly lasts ~50% longer (90 frames vs 60).
+   Already-stunned enemies are not retroactively extended.
+
+### Scenario 8: Sell EMP refund
+1. Continuation of scenario 2 (L0 EMP, spent=18). Open menu, choose
+   SEL.
+2. **Expected**: Tile clears; energy increases by 9 (= 18/2). Any
+   enemy currently stunned by that EMP keeps its existing `stun_timer`
+   and finishes the freeze normally.
+
+### Scenario 9: Armored bug appears in W7+
+1. Apply Setup (4) from spec plus extra towers as needed. Play
+   through to W7.
+2. **Expected**: Final spawn of W7 is an `ENEMY_ARMORED` (visibly
+   heavier sprite, slower walk).
+
+### Scenario 10: Armored HP scaling
+1. For each difficulty in {EASY, NORMAL, HARD}: restart, place
+   **exactly one AV-L0** at a position where it is the only tower in
+   range of the armored bug's path; play to W7; count shots to kill.
+2. **Expected**: EASY: 8 shots. NORMAL: 12 shots. HARD: 16 shots.
+
+### Scenario 11: Flash > stun visual
+1. Continuation of scenario 4 (≥1 stunned enemy on screen). While
+   the enemy is stunned, hit it with a tower projectile.
+2. **Expected**: For 3 frames the FLASH tile shows; then it reverts
+   to the STUN tile (stun_timer keeps counting under the flash).
+
+### Scenario 12: Pause freezes stun_timer
+1. Continuation of scenario 3. Stun an enemy, press START to pause
+   for 5 s, unpause.
+2. **Expected**: Enemy is still stunned for the same number of
+   remaining frames as when paused (countdown didn't progress).
+
+### Scenario 13: Existing waves unchanged
+1. New game on NORMAL with Setup (4). Record W1–W6 spawn timestamps
+   and counts.
+2. **Expected**: Spawn counts and inter-spawn delays match existing
+   values exactly. No `ENEMY_ARMORED` (sprite ID 2) appears in W1–W6.
+
+### Scenario 14: Host tests
+1. `just test`.
+2. **Expected**: All test binaries pass, including the 3 new tests.
+
+### Scenario 15: EMP placement audio (F3)
+1. Start a wave, wait until an enemy is on the path.
+2. Place an EMP tower so the enemy is in its range.
+3. **Expected**: SFX_TOWER_PLACE plays cleanly to completion, and the
+   first SFX_EMP_FIRE pulse is audibly distinct (~16 ms later, on the
+   following frame). The place SFX must not be cut short by the fire SFX.
+
+### Scenario 16: Overlapping EMPs cannot perma-freeze (F1)
+1. Place two EMPs whose ranges overlap a single path tile.
+2. Send a single tank-class enemy through that tile.
+3. **Expected**: The enemy is stunned, then walks freely for at least
+   ~60 frames, then may be stunned again. It must not be locked in
+   place indefinitely. (Stacking EMPs is  see spec L269-276.)wasteful 

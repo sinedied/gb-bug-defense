@@ -71,4 +71,18 @@
 #define INTER_WAVE_DELAY 180
 #define FIRST_GRACE       60
 
+/* Iter-3 #18: Armored enemy ------------------------------------------ */
+#define ARMORED_HP      12
+#define ARMORED_SPEED   0x0040      /* 0.25 px/frame */
+#define ARMORED_BOUNTY   8
+
+/* Iter-3 #18: EMP tower (type 2) ------------------------------------- */
+#define TOWER_EMP_COST          18
+#define TOWER_EMP_UPG_COST      12
+#define TOWER_EMP_COOLDOWN     120
+#define TOWER_EMP_COOLDOWN_L1  120
+#define TOWER_EMP_STUN          60   /* stun duration (frames), level 0 */
+#define TOWER_EMP_STUN_L1       90   /* stun duration (frames), level 1 */
+#define TOWER_EMP_RANGE_PX      16
+
 #endif /* GBTD_TUNING_H */

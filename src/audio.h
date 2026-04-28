@@ -14,6 +14,8 @@ enum {
                                  * the user immediately knows whether audio
                                  * reaches the emulator. See decisions.md
                                  * "Iter-2 audio diag: boot chime". */
+    SFX_EMP_FIRE,               /* Iter-3 #18: CH1, descending square sweep,
+                                 * prio=2. Played on successful EMP pulse. */
     SFX_COUNT
 };
 

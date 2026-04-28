@@ -30,7 +30,9 @@
 #define TILE_COMP_BR_C3 (MAP_TILE_BASE + 18)
 #define TILE_TOWER_B    (MAP_TILE_BASE + 19)
 #define TILE_TOWER_2_B  (MAP_TILE_BASE + 20)
-#define MAP_TILE_COUNT  21
+#define TILE_TOWER_3    (MAP_TILE_BASE + 21)
+#define TILE_TOWER_3_B  (MAP_TILE_BASE + 22)
+#define MAP_TILE_COUNT  23
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1
@@ -69,7 +71,13 @@
 #define SPR_GLYPH_T     34
 #define SPR_BUG_FLASH   35
 #define SPR_ROBOT_FLASH 36
-#define SPRITE_TILE_COUNT 37
+#define SPR_ARMORED_A     37
+#define SPR_ARMORED_B     38
+#define SPR_ARMORED_FLASH 39
+#define SPR_BUG_STUN      40
+#define SPR_ROBOT_STUN    41
+#define SPR_ARMORED_STUN  42
+#define SPRITE_TILE_COUNT 43
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

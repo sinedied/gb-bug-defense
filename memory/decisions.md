@@ -400,3 +400,80 @@
 1 tick of percussion silence" guarantee). Regression test:> "
 > `test_music.c::test_ch4_arbitration_boundary_on_unblock` (boundary
  deferred arm fires).
+
+### Iter-3 #18: Tower kind discriminator (damage vs stun)
+- **Date**: 2025-01-31
+- **Context**: EMP tower stuns instead of damaging; needed a clean way to keep damage and stun parameters in tower_stats_t without overloading fields.
+- **Decision**: Add `u8 kind` (TKIND_DAMAGE/TKIND_STUN) and dedicated `stun_frames`/`stun_frames_l1` fields to tower_stats_t. Damage tower fields are unread for stun towers and vice versa. tower_t per-tower WRAM unchanged. towers.c never touches enemy_t directly; it calls public enemies_try_stun()/enemies_is_stunned() APIs.
+- **Rationale**: Explicit > clever. Future towers (debuff, slow, AoE-damage) slot in by adding a kind value and the relevant stat fields.
+- **Alternatives**: Reuse damage_l0/l1 as stun_frames (rejected: bug-bait at every read site). Direct enemy_t.stun_timer write from towers.c (rejected: breaks encapsulation, fails host-test isolation).
+
+### Iter-3 #18: EMP cooldown only resets on a successful pulse
+- **Date**: 2025-01-31
+- **Context**: An EMP that scans an empty range every frame would otherwise have a 120-frame dead window after each fruitless attempt.
+- **Decision**: When an EMP scan finds zero stunnable targets, cooldown stays at 0 (the scan re-runs each frame). Cooldown resets to 120 only when at least one enemy was actually stunned that frame. Freshly-placed EMP also starts with cooldown=0.
+- **Rationale**: Avoids unreadable dead windows. Keeps EMP feeling responsive. The 14-iteration scan per frame is negligible cost on DMG.
+- **Alternatives**: Always reset cooldown after scan (rejected: dead-window UX). Start cooldown at 120 on placement (rejected: 2-second silent delay after placing).
+
+### Iter-3 #18: Sprite  flash > stun > walkpriority 
+- **Date**: 2025-01-31
+- **Context**: An enemy can be both flash (3 frames, hit feedback) and stun (60+ frames, frozen) simultaneously.
+- **Decision**: When both flash_timer and stun_timer are >0 in the same frame, the FLASH tile renders. stun_timer continues to count down underneath. Flash is 3 frames; stun is 60+; total stun duration is preserved.
+- **Rationale**: Flash is the damage-feedback channel and must not be silenced by stun. 3 lost stun-frames are imperceptible against 60+.
+- **Alternatives**: Stun > flash (rejected: damage feedback would be invisible while stunned). Pause stun_timer during flash (rejected: complicates accounting for no benefit).
+
+### Iter-3 #18: Stun cannot stack or extend
+- **Date**: 2025-01-31
+- **Context**: Multiple EMPs whose ranges overlap a single enemy.
+- **Decision**: enemies_try_stun() returns false if stun_timer > 0; the second EMP does not extend the stun. Upgrade L1 (90-frame stun) does not retroactively extend an active L0 stun (60).
+- **Rationale**: "Extend on re-stun" would let 2 EMPs perpetually freeze any enemy and trivialize tanks. Stacking should be a geographic strategy (different path segments), not a force-multiplier on the same tile.
+- **Alternatives**: Refresh stun on every successful try (rejected: trivializes tanks). Sum stun durations (rejected: same problem).
+
+### Iter-3 #18: Tower kind discriminator (damage vs stun)
+- **Date**: 2025-01-31
+- **Context**: EMP tower stuns instead of damaging; needed a clean way to keep damage and stun parameters in tower_stats_t without overloading fields.
+- **Decision**: Add `u8 kind` (TKIND_DAMAGE/TKIND_STUN) and dedicated `stun_frames`/`stun_frames_l1` fields to tower_stats_t. Damage tower fields are unread for stun towers and vice versa. tower_t per-tower WRAM unchanged. towers.c never touches enemy_t directly; it calls public enemies_try_stun()/enemies_is_stunned() APIs.
+- **Rationale**: Explicit > clever. Future towers (debuff, slow, AoE-damage) slot in by adding a kind value and the relevant stat fields.
+- **Alternatives**: Reuse damage_l0/l1 as stun_frames (rejected: bug-bait at every read site). Direct enemy_t.stun_timer write from towers.c (rejected: breaks encapsulation, fails host-test isolation).
+
+### Iter-3 #18: EMP cooldown only resets on a successful pulse
+- **Date**: 2025-01-31
+- **Context**: An EMP that scans an empty range every frame would otherwise have a 120-frame dead window after each fruitless attempt.
+- **Decision**: When an EMP scan finds zero stunnable targets, cooldown stays at 0 (the scan re-runs each frame). Cooldown resets to 120 only when at least one enemy was actually stunned that frame. Freshly-placed EMP also starts with cooldown=0.
+- **Rationale**: Avoids unreadable dead windows. Keeps EMP feeling responsive. The 14-iteration scan per frame is negligible cost on DMG.
+- **Alternatives**: Always reset cooldown after scan (rejected: dead-window UX). Start cooldown at 120 on placement (rejected: 2-second silent delay after placing).
+
+### Iter-3 #18: Sprite  flash > stun > walkpriority 
+- **Date**: 2025-01-31
+- **Context**: An enemy can be both flash (3 frames, hit feedback) and stun (60+ frames, frozen) simultaneously.
+- **Decision**: When both flash_timer and stun_timer are >0 in the same frame, the FLASH tile renders. stun_timer continues to count down underneath. Flash is 3 frames; stun is 60+; total stun duration is preserved.
+- **Rationale**: Flash is the damage-feedback channel and must not be silenced by stun. 3 lost stun-frames are imperceptible against 60+.
+- **Alternatives**: Stun > flash (rejected: damage feedback would be invisible while stunned). Pause stun_timer during flash (rejected: complicates accounting for no benefit).
+
+### Iter-3 #18: Stun cannot stack or extend
+- **Date**: 2025-01-31
+- **Context**: Multiple EMPs whose ranges overlap a single enemy.
+- **Decision**: enemies_try_stun() returns false if stun_timer > 0; the second EMP does not extend the stun. Upgrade L1 (90-frame stun) does not retroactively extend an active L0 stun (60).
+- **Rationale**: "Extend on re-stun" would let 2 EMPs perpetually freeze any enemy and trivialize tanks. Stacking should be a geographic strategy (different path segments), not a force-multiplier on the same tile.
+- **Alternatives**: Refresh stun on every successful try (rejected: trivializes tanks). Sum stun durations (rejected: same problem).
+
+### Iter-3 #18 F1: 3-outcome EMP cooldown rule prevents overlapping-EMP perma-freeze
+- **Date**: 2025-02-01
+ keep cooldown=0) let an idle 2nd EMP poll every frame waiting for the rival's stun to expire. Because towers_update runs before enemies_update each frame (game.c:159-160), the 2nd EMP always grabbed the unstun frame and re-stunned, repeating indefinitely. This contradicts spec L269-276 ("stacking EMPs is  perma-freeze was rejected").wasteful 
+ keep cooldown=0 to retry next frame. The new (b) branch is the chain-lock breaker: a redundant EMP burns its 120-frame cycle on a target it can't actually pulse, phase-locking with the rival rather than perma-freezing.
+ keep polling).
+- **Alternatives**: Reorder enemies_update before towers_update (rejected: cross-cutting frame-order change with broader implications). Per-enemy "stun cooldown owner" tracking (rejected: extra state, more complex).
+
+### Iter-3 #18 F2: TKIND_STUN upgrade preserves cooldown
+- **Date**: 2025-02-01
+- **Context**: towers_upgrade() unconditionally reset cooldown to cooldown_l1. For damage towers this is "immediately observable" L1 cadence. For EMP, cooldown_l0 == cooldown_l1 == 120, so resetting an idle EMP at cooldown=0 forced a 120-frame dead  a regression of the cooldown-on-success invariant (D-IT3-18-7).window 
+- **Decision**: Special-case TKIND_DAMAGE in towers_upgrade(): only damage towers reset cooldown on upgrade. EMP (TKIND_STUN) preserves its current cooldown across upgrade so an idle EMP fires on its next eligible frame with the new L1 stun duration.
+- **Rationale**: Keeps the upgrade UX immediate for the user (next pulse uses 90-frame stun) without violating cooldown-on-success.
+- **Alternatives**: Skip cooldown reset entirely for all kinds (rejected: damage tower L1 cadence change becomes observable only after the next natural cooldown). Set EMP cooldown to 0 explicitly on upgrade (rejected: equivalent to current state in practice but adds same-frame SFX collision risk for the  see F3).pulse 
+
+### Iter-3 #18 F3: Freshly-placed EMP cooldown=1 to avoid same-frame SFX collision
+- **Date**: 2025-02-01
+- **Context**: towers_try_place(EMP) plays SFX_TOWER_PLACE on CH1 (priority 2). Same frame, towers_update would fire the EMP at cooldown=0, calling SFX_EMP_FIRE (also CH1, priority 2). audio_play's preempt rule is `def->priority < s_ch[idx]. equal-priority preempt is  so the fire SFX overwrote the place SFX immediately and the player lost placement audio confirmation.allowed prio` 
+- **Decision**: Initialize freshly-placed EMP cooldown to 1 (not 0). The first pulse fires on frame N+1 instead of frame N, ~16 ms  imperceptible. SFX_TOWER_PLACE finishes its envelope cleanly before any SFX_EMP_FIRE is queued.later 
+- **Rationale**: Surgical 1-frame defer preserves the "stuns near-immediately on placement" UX promise while honoring the audio mixing contract. No changes to the SFX preempt rule (which is correct for the general case).
+- **Alternatives**: Suppress SFX_EMP_FIRE when SFX_TOWER_PLACE was triggered the same frame (rejected: bespoke audio-state lookup per call site). Lower SFX_EMP_FIRE priority (rejected: cross-cutting tweak that affects other interactions). Move towers_update before towers_try_place in playing_update (rejected: changes input latency semantics).

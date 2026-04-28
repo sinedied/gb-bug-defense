@@ -49,7 +49,7 @@ typedef i16      fix8;          /* 8.8 fixed point */
 #define PF_ROWS         17
 
 /* Enemy / tower type enums (mirrored in enemies.c / towers.c stat tables). */
-enum { ENEMY_BUG = 0, ENEMY_ROBOT = 1, ENEMY_TYPE_COUNT };
-enum { TOWER_AV  = 0, TOWER_FW    = 1, TOWER_TYPE_COUNT };
+enum { ENEMY_BUG = 0, ENEMY_ROBOT = 1, ENEMY_ARMORED = 2, ENEMY_TYPE_COUNT };
+enum { TOWER_AV  = 0, TOWER_FW    = 1, TOWER_EMP = 2, TOWER_TYPE_COUNT };
 
 #endif
