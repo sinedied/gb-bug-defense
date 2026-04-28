@@ -39,12 +39,18 @@ static const u16 NOISE_HIT[]   = { 0x0050 };  /* short sharp click */
 static const u16 NOISE_DEATH[] = { 0x0070 };  /* longer rumble */
 static const u16 WIN_NOTES[]   = { 0x06A4, 0x0721, 0x0783, 0x07C2 };  /* asc */
 static const u16 LOSE_NOTES[]  = { 0x07C2, 0x0721, 0x06A4, 0x05F2 };  /* desc */
+static const u16 PITCH_BOOT[]  = { 0x0700 };  /* boot chime — mid square */
 
 static const sfx_def_t S_SFX[SFX_COUNT] = {
     [SFX_TOWER_PLACE] = {
+        /* No NR10 sweep: the previous value 0x16 (shift 6, period 1, down)
+         * dropped the 11-bit frequency by ~26 every 7.8 ms and disabled the
+         * channel by hardware within ~30 ms — the SFX was a near-inaudible
+         * pop. Fixed pitch keeps it as a clean ~265 ms beep (the volume
+         * envelope still decays the note out). */
         .channel = 1, .priority = 2, .nrx1 = 0x80, .envelope = 0xF1,
-        .duration = 8, .sweep = 0x16,
-        .note_count = 1, .frames_per_note = 8, .pitches = PITCH_LO,
+        .duration = 16, .sweep = 0x00,
+        .note_count = 1, .frames_per_note = 16, .pitches = PITCH_LO,
     },
     [SFX_TOWER_FIRE] = {
         .channel = 2, .priority = 1, .nrx1 = 0x80, .envelope = 0xA1,
@@ -52,7 +58,9 @@ static const sfx_def_t S_SFX[SFX_COUNT] = {
         .note_count = 1, .frames_per_note = 4, .pitches = PITCH_FIRE,
     },
     [SFX_ENEMY_HIT] = {
-        .channel = 4, .priority = 1, .nrx1 = 0x3F, .envelope = 0x71,
+        /* Bumped from 0xF1 vol 7 to vol 12 — the hit click was barely
+         * perceptible against the more prominent fire/death SFX. */
+        .channel = 4, .priority = 1, .nrx1 = 0x3F, .envelope = 0xC1,
         .duration = 3, .is_noise = 1,
         .note_count = 1, .frames_per_note = 3, .pitches = NOISE_HIT,
     },
@@ -70,6 +78,16 @@ static const sfx_def_t S_SFX[SFX_COUNT] = {
         .channel = 1, .priority = 3, .nrx1 = 0x80, .envelope = 0xF3,
         .duration = 0,
         .note_count = 4, .frames_per_note = 10, .pitches = LOSE_NOTES,
+    },
+    [SFX_BOOT] = {
+        /* Diagnostic chime fired from audio_init(). Channel 2 (not ch1) so
+         * it can't be preempted/blocked by a leaked ch1 priority and so the
+         * chime registers don't fight ch1 sweep state on the very first
+         * audio_play() of the run. Loud (vol 15, no envelope decay sweep)
+         * and short (~200 ms) — purely a "hello, audio works" tone. */
+        .channel = 2, .priority = 1, .nrx1 = 0x80, .envelope = 0xF0,
+        .duration = 12,
+        .note_count = 1, .frames_per_note = 12, .pitches = PITCH_BOOT,
     },
 };
 
@@ -126,6 +144,13 @@ void audio_init(void) {
     NR50_REG = 0x77;   /* both stereo terminals at max volume */
     NR51_REG = 0xFF;   /* all 4 channels routed to L+R */
     audio_reset();
+    /* Boot chime — single audible note that confirms the APU is wired up
+     * and the host emulator's audio backend is unmuted. Without this, a
+     * silent emulator (Qt mGBA on macOS sometimes mutes by default) is
+     * indistinguishable from broken SFX code. The note advances via the
+     * normal audio_tick() in the main loop and silences itself after
+     * ~200 ms. */
+    audio_play(SFX_BOOT);
 }
 
 void audio_reset(void) {

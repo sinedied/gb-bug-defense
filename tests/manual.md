@@ -84,11 +84,22 @@ checks below cover the audible / visual / interactive surfaces that no
 host harness can verify.
 
 ### SFX audibility (#15)
-Run with audio enabled: `just run`. With mGBA's audio panel open and
-volume up, every action below must produce its blip:
+Run with audio enabled: `just run` (passes `-C mute=0 -C volume=0x100`
+so Qt mGBA's mute toggle and saved-volume can't silence the run).
+With the emulator's audio panel open, every action below must produce
+its blip:
 
-1. Place a tower (A on a buildable tile) — short low-blip on ch1
-   (`SFX_TOWER_PLACE`). Same blip plays on upgrade and sell.
+0. **Boot chime** — the moment the ROM starts (before the title screen
+   logic settles), a single ~200 ms square tone plays on ch2
+   (`SFX_BOOT`, fired from `audio_init`). If you don't hear this, the
+   ROM is fine; the issue is host-side (Qt mGBA `Audio > Mute` enabled,
+   no audio backend selected in `Tools > Settings > Audio`, or system
+   output muted). See README "Audio".
+1. Place a tower (A on a buildable tile) — clean ~265 ms low beep on
+   ch1 (`SFX_TOWER_PLACE`). Same blip plays on upgrade and sell.
+   (NB: pre-fix this was a near-inaudible pop because NR10 sweep killed
+   the channel within ~30 ms; sweep is now disabled and duration is
+   16 frames.)
 2. Idle while a tower fires at a bug — periodic mid-square blip on ch2
    (`SFX_TOWER_FIRE`).
 3. A projectile hits a robot (does not kill) — short noise click on ch4

@@ -59,6 +59,21 @@ final wave is a 28-enemy "boss" mix) without letting HP hit zero.
 Win → "SYSTEM CLEAN :)". Lose → "KERNEL PANIC X_X". Sound effects
 play on channels 1, 2 and 4 throughout.
 
+## Audio
+
+A short **boot chime** plays the moment the ROM starts — if you don't hear
+it, the issue is on the emulator/host side, not in the ROM.
+
+On macOS, Homebrew's `mgba` package ships only the Qt frontend (no SDL
+binary). Qt mGBA can boot with audio effectively muted. `just run` works
+around this by passing `-C mute=0 -C volume=0x100` on the command line.
+If you launch the app any other way and still hear nothing, check the
+mGBA menu bar:
+
+- **Audio → Mute** — must be unchecked
+- **Tools → Settings → Audio** — pick a valid output backend / device
+- macOS system volume + per-app volume in System Settings → Sound
+
 ## Project layout
 
 ```

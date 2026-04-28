@@ -78,14 +78,31 @@ test:
     mkdir -p "{{BUILD}}"
     cc -std=c99 -Wall -Wextra -O2 -Isrc tests/test_math.c -o "{{BUILD}}/test_math"
     "{{BUILD}}/test_math"
+    # test_audio compiles src/audio.c against host stubs of <gb/gb.h> and
+    # <gb/hardware.h> (tests/stubs/) so we can assert exact NRxx_REG writes
+    # without an emulator. Stub dir must come BEFORE -Isrc on the include
+    # path so it shadows GBDK's real headers.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
+       tests/test_audio.c src/audio.c -o "{{BUILD}}/test_audio"
+    "{{BUILD}}/test_audio"
 
 # Build + launch emulator (one-command playtest)
+#
+# Audio: macOS Homebrew only ships the Qt frontend (no SDL `mgba` binary —
+# the lowercase `mgba` symlink resolves to the Qt app bundle on a
+# case-insensitive APFS volume). Qt mGBA on macOS sometimes initializes
+# with the in-app `Audio > Mute` toggle set OR with a low Qt Multimedia
+# volume that produces no audible output. We force-override both via
+# `-C mute=0 -C volume=0x100` (mGBA config keys, max=0x100) so audio is
+# always on regardless of any prior persisted setting. If you still hear
+# nothing, check the menu bar: Audio > Mute (must be unchecked) and
+# macOS system volume.
 run: build
-    mgba -3 "{{ROM}}"
+    mgba -3 -C mute=0 -C volume=0x100 "{{ROM}}"
 
 # Launch emulator on existing ROM (no rebuild)
 emulator:
-    mgba -3 "{{ROM}}"
+    mgba -3 -C mute=0 -C volume=0x100 "{{ROM}}"
 
 clean:
     rm -rf "{{BUILD}}"

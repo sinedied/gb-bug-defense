@@ -10,6 +10,10 @@ enum {
     SFX_ENEMY_DEATH,
     SFX_WIN,
     SFX_LOSE,
+    SFX_BOOT,                   /* one-shot chime fired from audio_init() so
+                                 * the user immediately knows whether audio
+                                 * reaches the emulator. See decisions.md
+                                 * "Iter-2 audio diag: boot chime". */
     SFX_COUNT
 };
 
