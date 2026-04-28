@@ -527,6 +527,14 @@ SPR_GLYPH_6     = glyph_to_sprite('6')
 SPR_GLYPH_7     = glyph_to_sprite('7')
 SPR_GLYPH_8     = glyph_to_sprite('8')
 SPR_GLYPH_9     = glyph_to_sprite('9')
+# Iter-3 #22 (pause menu): additional letters for PAUSE / RESUME / QUIT.
+# Pixel-identical mirrors of the FONT[] entries so they match HUD letters.
+SPR_GLYPH_A     = glyph_to_sprite('A')
+SPR_GLYPH_R     = glyph_to_sprite('R')
+SPR_GLYPH_M     = glyph_to_sprite('M')
+SPR_GLYPH_Q     = glyph_to_sprite('Q')
+SPR_GLYPH_I     = glyph_to_sprite('I')
+SPR_GLYPH_T     = glyph_to_sprite('T')
 
 sprite_tiles = [
     ('SPR_CURSOR_A',    SPR_CURSOR_A),
@@ -558,6 +566,12 @@ sprite_tiles = [
     ('SPR_GLYPH_7',     SPR_GLYPH_7),
     ('SPR_GLYPH_8',     SPR_GLYPH_8),
     ('SPR_GLYPH_9',     SPR_GLYPH_9),
+    ('SPR_GLYPH_A',     SPR_GLYPH_A),
+    ('SPR_GLYPH_R',     SPR_GLYPH_R),
+    ('SPR_GLYPH_M',     SPR_GLYPH_M),
+    ('SPR_GLYPH_Q',     SPR_GLYPH_Q),
+    ('SPR_GLYPH_I',     SPR_GLYPH_I),
+    ('SPR_GLYPH_T',     SPR_GLYPH_T),
 ]
 
 # ----------------------------------------------------------------------------
@@ -745,7 +759,13 @@ assets_h = """\
 #define SPR_GLYPH_7     26
 #define SPR_GLYPH_8     27
 #define SPR_GLYPH_9     28
-#define SPRITE_TILE_COUNT 29
+#define SPR_GLYPH_A     29
+#define SPR_GLYPH_R     30
+#define SPR_GLYPH_M     31
+#define SPR_GLYPH_Q     32
+#define SPR_GLYPH_I     33
+#define SPR_GLYPH_T     34
+#define SPRITE_TILE_COUNT 35
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

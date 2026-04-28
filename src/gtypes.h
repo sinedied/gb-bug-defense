@@ -28,10 +28,17 @@ typedef i16      fix8;          /* 8.8 fixed point */
 /* Pool sizes, economy, enemy/tower/projectile/wave tuning all live in
  * tuning.h (host-compilable, shared with tests/test_math.c). */
 
-/* OAM slot allocation (iter-2) */
+/* OAM slot allocation (iter-3) — see memory/conventions.md "Iter-3 conventions".
+ * Pause and the upgrade/sell menu are mutually exclusive (game.c enforces
+ * single-modal-at-a-time) and both own the physical range 1..16. Iter-2
+ * counted 14 here (slots 15..16 reserved unused); iter-3 #22 promoted them
+ * into the menu/pause range. menu.c::hide_menu_oam now zeroes all 16
+ * slots even though menu_render only paints cells 0..13. */
 #define OAM_CURSOR        0
-#define OAM_MENU_BASE     1   /* 1..14 — menu glyphs (only when menu open) */
-#define OAM_MENU_COUNT   14
+#define OAM_MENU_BASE     1   /* 1..16 — menu glyphs (only when menu open) */
+#define OAM_MENU_COUNT   16
+#define OAM_PAUSE_BASE    OAM_MENU_BASE   /* alias: pause shares OAM 1..16 */
+#define OAM_PAUSE_COUNT   OAM_MENU_COUNT
 #define OAM_ENEMIES_BASE 17   /* 17..30 (14 slots) */
 #define OAM_PROJ_BASE    31   /* 31..38 (8 slots) — was 29..36 in MVP */
 #define OAM_TOTAL        40

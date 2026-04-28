@@ -85,6 +85,19 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
        tests/test_audio.c src/audio.c -o "{{BUILD}}/test_audio"
     "{{BUILD}}/test_audio"
+    # test_pause compiles src/pause.c against the same host stubs.
+    # Collaborator modules (input/menu/cursor/enemies/projectiles) are
+    # stubbed inside test_pause.c so each test scripts button presses
+    # deterministically without pulling GBDK-dependent sources.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc -Ires \
+       tests/test_pause.c src/pause.c -o "{{BUILD}}/test_pause"
+    "{{BUILD}}/test_pause"
+    # test_game_modal exercises the pure modal-precedence helper in
+    # src/game_modal.h (header-only, no GBDK linkage). Catches F1
+    # (same-frame menu-close + START leaks into pause_open).
+    cc -std=c99 -Wall -Wextra -O2 -Isrc \
+       tests/test_game_modal.c -o "{{BUILD}}/test_game_modal"
+    "{{BUILD}}/test_game_modal"
 
 # Build + launch emulator (one-command playtest)
 #

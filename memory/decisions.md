@@ -175,3 +175,45 @@
 - **Decision**: Extend `tests/stubs/gb/hardware.h` with an append-only write log: each `NRxx_REG` macro becomes `_NR_LOG(idx)` which records the register index in `g_write_log[]` (cap 256, bounds-checked) and yields the lvalue slot via a comma-expression (`*((..., &g_audio_regs[idx]))`). Test helpers `first_write_idx(reg)` and `write_count(reg)` query the log. F1 now asserts `first_write_idx(NR52) == 0` and `< first_write_idx({NR50, NR51, NR22, NR24})`, plus that `audio_reset()`'s NR12/NR42 silence writes precede the SFX_BOOT trigger (catches regressions that delete `audio_reset()` from `audio_init()`). F2 now plays `SFX_BOOT` then `SFX_TOWER_FIRE` (two distinct ch2/prio-1 SFX with different envelopes/pitches) and asserts post-state reflects the SECOND SFX (NR22==0xA1, NR23==0x83). Added a complementary same-prio-different-channel test (SFX_TOWER_FIRE on ch2 + SFX_ENEMY_HIT on ch4, both prio 1) confirming both stay active.
 - **Rationale**: Approach A (append-only log of writes) is strictly more powerful than per-register first-write counters and only ~10 lines of stub code. The lvalue-via-comma-expression macro keeps `src/audio.c` completely untouched (no behaviour change, ROM size unchanged at 32768 B). Negative regression checks confirmed: introducing `NR50_REG = 0x77;` before `NR52_REG = 0x80;` makes the F1 ordering assertions fail; flipping the preempt comparator from `<` to `<=` (rejecting equal-priority same-channel) makes the F2 NR22/NR23 assertions fail.
 - **Alternatives**: Per-register first-write sequence numbers (Approach B; sufficient for ordering but couldn't easily express "NR22  2 times"); count-only tracking (no ordering info); modifying `audio.c` to call a logging hook (invasive,  tests must not perturb production code).rejected written 
+
+### Iter-3 #22: Pause = flag inside PLAYING + new `pause.{h,c}` module
+- **Date**: 2026-05-01
+- **Context**: Iteration-3 roadmap item #22 — START button pauses the game with RESUME / QUIT options.
+- **Decision**: New module `src/pause.{h,c}` mirroring the iter-2 modal sprite-overlay pattern. Pause is a `bool s_open` flag inside `pause.c`; the top-level state machine stays at `{TITLE, PLAYING, WIN, LOSE}`. `playing_update` early-returns into `pause_update()` when paused, identical to the menu-open arm. New helper `game_is_modal_open()` is the single source of truth for "is gameplay frozen". `pause_open()` is a defensive no-op when `menu_is_open()`.
+- **Rationale**: Render path is identical to PLAYING (same BG, only an overlay differs); a dedicated state would add transition bookkeeping with no benefit. Separate module from `menu.c` because anchor (fixed center vs tower-relative), layout (3×8 vs 2×7), action set, and exit transition (calls `enter_title`) all differ materially.
+- **Alternatives**: New `GS_PAUSED` state (rejected — bookkeeping); extend `menu.c` with a mode flag (rejected — pollutes upgrade/sell logic).
+
+### Iter-3 #22: OAM range 1..16 shared by pause + upgrade/sell menu (mutually exclusive)
+- **Date**: 2026-05-01
+- **Context**: Pause overlay needs 16 sprite cells; iter-2 menu uses 14. OAM is capped at 40 with hard pools.
+- **Decision**: Bump `OAM_MENU_COUNT` 14 → 16. Promote previously reserved slots 15..16 into the menu range. Both modules own the same physical OAM range 1..16 — collision is impossible because `game.c` enforces single-modal-at-a-time. `menu.c::hide_menu_oam` now hides slots 1..16 on `menu_close()` even though `menu_render` only paints 1..14. Do not repurpose slots 15..16 for anything other than menu/pause overlay.
+- **Rationale**: Densest OAM packing. Slots 15..16 were already reserved-unused (legacy from iter-2 F3 tower-OAM reservation).
+- **Alternatives**: Carve a separate range for pause (no free slots without shrinking enemies/projectiles pool — both at hard min).
+
+### Iter-3 #22: Same-frame gameover supersedes pause-open
+- **Date**: 2026-05-01
+- **Context**: If START is pressed on the same frame an enemy reaches the computer (HP→0) or the last wave is cleared, two transitions race.
+- **Decision**: `playing_update` checks `economy_get_hp() == 0` and `waves_all_cleared()` *before* the START → `pause_open()` handler. Both gameover branches end with explicit `return;` (the WIN branch in iter-2 code was missing this — added as part of iter-3 #22). Gameover transitions execute first; the pause request is silently dropped that frame.
+- **Rationale**: Gameover is terminal; pausing into a lost game would require special UX and feels broken to the player.
+- **Alternatives**: Pause first, then enter gameover on resume (rejected — bizarre UX).
+
+### Iter-3 #22: `audio_reset()` lives in the QUIT path, NOT in `enter_title()`
+- **Date**: 2026-05-01
+- **Context**: Quit-to-title from the pause menu must silence any in-flight SFX from the abandoned run. Naively adding `audio_reset()` to `enter_title()` would also fire it on every boot (since `game_init() → enter_title()` runs at ROM start), racing with `audio_init()` and risking the NR52-first ordering invariant locked-in by `tests/test_audio.c`.
+- **Decision**: `playing_update`'s pause-quit branch calls `audio_reset()` immediately before `enter_title()`. `enter_title()` itself stays audio-free.
+- **Rationale**: Surgical — applies the reset exactly where in-flight SFX exists. Preserves boot-time audio ordering. `audio_reset()` is idempotent so the localised call is safe.
+- **Alternatives**: Add to `enter_title()` (rejected — fragile, conflicts with test_audio ordering); add a new `audio_drain()` API (overkill — `audio_reset` already does this).
+
+### Iter-3 #22: No pause-open/close SFX in iter-3
+- **Date**: 2026-05-01
+- **Context**: Pause UX could include a small chime; user prompt left it optional.
+- **Decision**: Pause is silent on open and close. `audio_tick()` continues running so any in-flight SFX drains naturally (per iter-2 F1).
+- **Rationale**: Avoids touching `audio.c` and adding a new ordering test in `test_audio.c`. Pause is a short-duration UX; silent transition matches the iter-2 modal style.
+- **Alternatives**: Add `SFX_PAUSE_OPEN`/`SFX_PAUSE_CLOSE` (deferred — minimal-audio bias).
+
+### Modal-precedence helper extracted to `src/game_modal.h`
+- **Date**: 2026-05-02
+- **Context**: F1  `playing_update()` ran `menu_update()` then fell through to the END-of-frame START handler. Same-frame "A/B closes upgrade menu + START pressed" passed `!menu_is_open()` (just closed) and unintentionally opened pause. The bug went undetected because all pause tests linked only `src/pause.c` in isolation; modal dispatch in `playing_update()` had no host-level coverage.regression 
+- **Decision**: (1) Latch `bool menu_was_open = menu_is_open();` at the top of `playing_update()` BEFORE any modal-mutating call. (2) Extract the START-gating predicate into a header-only pure function `playing_modal_should_open_pause(menu_was_open, start_pressed, menu_now_open, pause_now_open)` in `src/game_modal.h`. (3) Add `tests/test_game_modal.c` covering F1 + 4 supporting cases; wired into `just test`.
+- **Rationale**: A header-only `static inline` helper keeps the predicate testable on the host with zero GBDK linkage (no game.c/towers/enemies pull-in). Latching `menu_was_open` is cheaper and clearer than an early `return;` after `menu_update()` and preserves the existing "audio_tick + economy_tick run while modal" behavior unchanged for both pause and upgrade-menu branches.
+- **Alternatives**: (a) Early `return;` after the `menu_is_open()` branch (Option B in the F1  works but duplicates the `economy_tick()/audio_tick()` pair already present in the menu_open() in-frame path and the pause branch, increasing the surface area of the "drain modal SFX/income" invariant. (b) Compile `src/game.c` against a wide host-stub layer for an end-to-end test of `playing_ rejected as too invasive (game.c transitively pulls towers/enemies/projectiles/waves/economy/hud, all GBDK-dependent).update()` finding) 

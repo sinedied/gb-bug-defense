@@ -52,7 +52,13 @@
 #define SPR_GLYPH_7     26
 #define SPR_GLYPH_8     27
 #define SPR_GLYPH_9     28
-#define SPRITE_TILE_COUNT 29
+#define SPR_GLYPH_A     29
+#define SPR_GLYPH_R     30
+#define SPR_GLYPH_M     31
+#define SPR_GLYPH_Q     32
+#define SPR_GLYPH_I     33
+#define SPR_GLYPH_T     34
+#define SPRITE_TILE_COUNT 35
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

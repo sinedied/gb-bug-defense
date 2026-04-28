@@ -173,3 +173,49 @@ its blip:
    selected tower type all reset to defaults. No stale menu sprites
    linger on the title screen even if the menu was open at the moment
    the lose state triggered.
+
+### Pause menu (# iter-3)22 
+See `specs/iter3-22-pause.md` for the full scenario 9). Thelist (
+checks below cover behaviors that no host harness can verify (modal
+precedence, same-frame ordering, held-button edge detection, no-SFX
+bleed, full reset on QUIT, OAM positions on real OAM).
+
+1. **Open / resume ( From PLAYING (W1+), press START. Withinhappy)** 
+   1 frame: `PAUSE` header + `>RESUME` + `QUIT` overlay appears at
+   screen `(48, 64)`. Enemies/projectiles freeze (no flicker). The
+   placement cursor disappears (OAM 0 moved to `(0,0)`). Press START,
+ overlay disappears; entities resume; cursor reappears.
+2. **Selection  Open pause, press DOWN: chevron snaps to QUITwrap** 
+   row (y=96). DOWN again: wraps to RESUME (y=88). UP from RESUME:
+   wraps to QUIT.
+3. **Quit-to-title (full  Open pause, DOWN, A. Title screenreset)** 
+   appears with no leftover sprites (no enemy/projectile/menu/pause
+ new game with HP=5, E=030, W:01/10.
+ the
+   upgrade/sell menu opens. Press START. Upgrade/sell menu remains
+   open and unchanged; pause does NOT open. (Tests the
+   `if (menu_is_open())` arm running before the START handler.)
+5. **Gameover wins over pause ( Place no towers; on theLOSE)** 
+   frame the first bug enters the computer tile, mash START. LOSE
+   screen appears; pause overlay never visible. Approximate timing
+   acceptable.
+6. **Gameover wins over pause ( Reach W10; as the last enemyWIN)** 
+   dies, mash START. WIN screen appears; pause overlay never visible.
+   *This is the regression test for the iter-2 missing `return;` after
+   `enter_gameover( without the fix, pause glyphs would painttrue);` 
+   over the WIN screen.*
+7. **START on TITLE / WIN /  START at title still starts a newLOSE** 
+   game; START at win/lose still returns to title. Pause is local to
+   GS_PLAYING.
+8. **Held START across  From paused, press A (resume). Keepresume** 
+   holding START for 1 s. Pause does NOT immediately re-open. Release
+ pause opens. (Edge-detection sanity.)
+9. **No SFX  While paused, no tower-fire, enemy-hit, orbleed** 
+   enemy-death SFX. Any in-flight stinger from before pause drains
+   naturally over its remaining frames.
+10. **Passive income during  Open pause, note E. Wait ~4 s.pause** 
+    Resume. E increased by ~1 per 180 frames (`economy_tick` runs
+    during pause; entity ticks do not).
+  While paused, slots 1..16OAM)** 
+    sit at the screen pixels documented in 4. Slot 0 (cursor)spec 
+    and slots 17..38 are at `(0, 0)`.
