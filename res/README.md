@@ -16,7 +16,8 @@ Contents:
 | `title_tilemap`    | Full 20×18 BG map for the title screen.     |
 | `win_tilemap`      | Full 20×18 BG map for the win screen.       |
 | `lose_tilemap`     | Full 20×18 BG map for the lose screen.      |
-| `gameplay_tilemap` | 20×17 play-field tile indices.              |
-| `gameplay_classmap`| 20×17 tile classification (TC_GROUND / TC_PATH / TC_COMPUTER). |
+| `gameplayN_tilemap`  | 20×17 play-field tile indices for map N (N∈{1,2,3}).   |
+| `gameplayN_classmap` | 20×17 tile classification (TC_GROUND / TC_PATH / TC_COMPUTER) for map N. |
+| `gameplayN_waypoints`| Waypoint list for map N (Iter-3 #17).                  |
 
 DMG palette (BGP `0xE4`): 0=white, 1=light grey, 2=dark grey, 3=black.

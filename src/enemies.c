@@ -149,10 +149,13 @@ bool enemies_apply_damage(u8 idx, u8 dmg) {
 static void step_enemy(u8 i) {
     enemy_t *e = &s_enemies[i];
     const waypoint_t *wps = map_waypoints();
+    /* Iter-3 #17: read once per call (Map 2 has 10 waypoints; the old
+     * compile-time WAYPOINT_COUNT macro is gone). */
+    const u8 wp_n = map_waypoint_count();
 
     /* Target = next waypoint (wp_idx + 1). */
     u8 nxt = e->wp_idx + 1;
-    if (nxt >= WAYPOINT_COUNT) {
+    if (nxt >= wp_n) {
         /* Reached computer: damage + despawn. */
         economy_damage(1);
         e->alive = 0;

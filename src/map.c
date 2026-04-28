@@ -3,17 +3,16 @@
 #include "assets.h"
 #include <gb/gb.h>
 
-/* Authoritative waypoints (verbatim from spec §6 / mvp-design.md §3). */
-static const waypoint_t s_waypoints[WAYPOINT_COUNT] = {
-    { -1,  2 },
-    {  0,  2 },
-    {  8,  2 },
-    {  8,  9 },
-    { 15,  9 },
-    { 15,  5 },
-    { 17,  5 },
-    { 18,  5 },
+/* Iter-3 #17: map registry. External code reaches the active map only
+ * through the public accessors below — `s_maps` is private. `map.c`
+ * MUST NOT include `game.h` (D8); the active id flows in via map_load. */
+static const map_def_t s_maps[MAP_COUNT] = {
+    { gameplay1_tilemap, gameplay1_classmap, gameplay1_waypoints,  8, 18, 4 },
+    { gameplay2_tilemap, gameplay2_classmap, gameplay2_waypoints, 10, 18, 4 },
+    { gameplay3_tilemap, gameplay3_classmap, gameplay3_waypoints,  8, 18, 4 },
 };
+
+static u8 s_active_map_id;     /* power-on default = MAP_1 (zero-init) */
 
 /* Iter-3 #21: computer corruption is a 5-state HP-keyed progression
  * (see specs/iter3-21-animations.md §3.2). LUT is indexed
@@ -35,8 +34,10 @@ static const u8 s_comp_tiles[5][4] = {
 static u8 s_state;
 static u8 s_state_dirty;
 
-void map_load(void) {
+void map_load(u8 id) {
     u8 row;
+    if (id >= MAP_COUNT) id = 0;
+    s_active_map_id = id;
     /* Reset corruption tracking so a quit-from-lost-run -> new-game does
      * NOT redundantly repaint the freshly-pristine cluster on the first
      * post-enter_playing frame. The gameplay tilemap already encodes
@@ -47,16 +48,24 @@ void map_load(void) {
      * which is far more than fits in a single VBlank window. */
     for (row = 0; row < PF_ROWS; row++) {
         set_bkg_tiles(0, row + HUD_ROWS, PF_COLS, 1,
-                      &gameplay_tilemap[row * PF_COLS]);
+                      &s_maps[s_active_map_id].tilemap[row * PF_COLS]);
     }
 }
 
 u8 map_class_at(u8 tx, u8 ty) {
     if (tx >= PF_COLS || ty >= PF_ROWS) return TC_PATH; /* off-field = invalid */
-    return gameplay_classmap[ty * PF_COLS + tx];
+    return s_maps[s_active_map_id].classmap[ty * PF_COLS + tx];
 }
 
-const waypoint_t *map_waypoints(void) { return s_waypoints; }
+const waypoint_t *map_waypoints(void) {
+    return s_maps[s_active_map_id].waypoints;
+}
+
+u8 map_waypoint_count(void) {
+    return s_maps[s_active_map_id].waypoint_count;
+}
+
+u8 map_active(void) { return s_active_map_id; }
 
 void map_set_computer_state(u8 hp) {
     u8 ns = map_hp_to_corruption_state(hp);
@@ -68,10 +77,14 @@ void map_set_computer_state(u8 hp) {
 void map_render(void) {
     if (!s_state_dirty) return;
     s_state_dirty = 0;
-    /* Computer occupies pf rows 4..5, cols 18..19 -> screen rows 5..6 */
-    u8 sr = HUD_ROWS + 4;
-    set_bkg_tile_xy(18, sr,     s_comp_tiles[s_state][0]);
-    set_bkg_tile_xy(19, sr,     s_comp_tiles[s_state][1]);
-    set_bkg_tile_xy(18, sr + 1, s_comp_tiles[s_state][2]);
-    set_bkg_tile_xy(19, sr + 1, s_comp_tiles[s_state][3]);
+    /* Iter-3 #17: computer position comes from the active map_def
+     * (D10 + convention "computer hardcoding eliminated"). */
+    const map_def_t *cur = &s_maps[s_active_map_id];
+    u8 sr = HUD_ROWS + cur->computer_ty;
+    u8 sc = cur->computer_tx;
+    set_bkg_tile_xy(sc,     sr,     s_comp_tiles[s_state][0]);
+    set_bkg_tile_xy(sc + 1, sr,     s_comp_tiles[s_state][1]);
+    set_bkg_tile_xy(sc,     sr + 1, s_comp_tiles[s_state][2]);
+    set_bkg_tile_xy(sc + 1, sr + 1, s_comp_tiles[s_state][3]);
 }
+

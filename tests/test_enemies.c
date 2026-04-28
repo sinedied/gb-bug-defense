@@ -40,11 +40,13 @@ void set_sprite_tile(unsigned char nb, unsigned char tile) {
 /* map.h stubs */
 #include "map.h"
 
-static waypoint_t s_waypoints[WAYPOINT_COUNT] = {
+#define TEST_WP_COUNT 8
+static waypoint_t s_waypoints[TEST_WP_COUNT] = {
     {-1, 2}, {0, 2}, {8, 2}, {8, 9}, {15, 9}, {15, 5}, {17, 5}, {18, 5}
 };
 
 const waypoint_t *map_waypoints(void) { return s_waypoints; }
+u8 map_waypoint_count(void) { return TEST_WP_COUNT; }
 
 /* economy.h stubs */
 static int s_damage_count;

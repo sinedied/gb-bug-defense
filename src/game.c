@@ -28,6 +28,10 @@ static u8 s_anim_frame;        /* iter-3 #21: global animation phase */
  * cycles within a power-on session. NOT zero-init — relies on crt0's
  * .data copy from ROM (acceptance scenario #1 is the regression guard). */
 static u8 s_difficulty = DIFF_NORMAL;
+/* Iter-3 #17: active map id (0..MAP_COUNT-1). Same persistence model
+ * as s_difficulty — survives enter_title/enter_playing within one
+ * power-on session, resets to MAP_1 on cold-boot via .data zero-init. */
+static u8 s_active_map = 0;
 
 u8 game_get_selected_tower_type(void) { return s_selected_type; }
 
@@ -36,6 +40,11 @@ u8 game_anim_frame(void) { return s_anim_frame; }
 u8 game_difficulty(void) { return s_difficulty; }
 void game_set_difficulty(u8 d) {
     if (d < DIFF_COUNT) s_difficulty = d;
+}
+
+u8 game_active_map(void) { return s_active_map; }
+void game_set_active_map(u8 m) {
+    if (m < MAP_COUNT) s_active_map = m;
 }
 
 bool game_is_modal_open(void) {
@@ -64,7 +73,7 @@ static void enter_playing(void) {
      * happen during DISPLAY_OFF so they bypass active-scan VRAM blocking. */
     DISPLAY_OFF;
     gfx_hide_all_sprites();
-    map_load();
+    map_load(game_active_map());
     /* Init game state first so HUD reads correct values on its first draw. */
     s_selected_type = TOWER_AV;
     economy_init();

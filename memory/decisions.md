@@ -477,3 +477,25 @@
 - **Decision**: Initialize freshly-placed EMP cooldown to 1 (not 0). The first pulse fires on frame N+1 instead of frame N, ~16 ms  imperceptible. SFX_TOWER_PLACE finishes its envelope cleanly before any SFX_EMP_FIRE is queued.later 
 - **Rationale**: Surgical 1-frame defer preserves the "stuns near-immediately on placement" UX promise while honoring the audio mixing contract. No changes to the SFX preempt rule (which is correct for the general case).
 - **Alternatives**: Suppress SFX_EMP_FIRE when SFX_TOWER_PLACE was triggered the same frame (rejected: bespoke audio-state lookup per call site). Lower SFX_EMP_FIRE priority (rejected: cross-cutting tweak that affects other interactions). Move towers_update before towers_try_place in playing_update (rejected: changes input latency semantics).
+
+### Iter-3 # Map registry & two-row title selector17 
+- **Date**: 2026-04-28
+- **Context**: Roadmap # three maps with different path layouts and a map-select on title. Spec at `specs/iter3-17-maps.md`.17 
+- **Decision**: 
+  - Maps are described by `map_def_t { tilemap, classmap, waypoints, waypoint_count, computer_tx, computer_ty }`. `src/map.c` owns one `static const map_def_t s_maps[MAP_COUNT]`; `map_load(u8 id)` selects active. `map.c` does NOT include `game.h`; the active id flows in as the `map_load` argument (D8).
+  - Active map persists at file scope in `src/game.c` as `static u8 s_active_map = 0`, symmetric with `s_difficulty`. Neither is reset in `enter_title()`/`enter_playing()`. Power-on default = MAP_1 via `.data` zero-init. SRAM persistence is feature #19.
+  - `map_render` reads `computer_tx/ty` from the active def; the literal `(18, sr)` block in `map.c::map_render` is removed.
+  - All three maps anchor the 22 computer cluster at TL=(18,4) (designer  keeps corruption LUT and pause anchor invariant). The fields exist so future maps can move it.choice 
+  - `WAYPOINT_COUNT` macro is deleted from `src/map.h`; `enemies.c::step_enemy` uses `map_waypoint_count()` (cached) instead. This is the only non-`map.c` change required for the registry refactor.
+  - Title screen carries TWO stacked selectors (difficulty row 10, map row 12) plus a one-tile focus chevron `>` at column 3 of the focused row. UP/DOWN edge-only toggles `s_title_focus`; LEFT/RIGHT cycles the focused selector. Both `enter_title()` resets `s_title_focus = 0`.
+  - Title VBlank priority chain (extends iter-3 #20 selector-first / blink-deferred): `s_diff_dirty` > `s_map_dirty` > `s_focus_dirty` > `s_dirty`. Service ONE per frame; each branch returns. Worst-case 12 writes/16 cap.frame, 
+  - Pure-helper family extended: `src/map_select.h` (`<stdint.h>`-only, `MAP_COUNT`-wrap cycle). Tested in `tests/test_maps.c`.
+  - Wave script and difficulty constants are shared across maps. Path geometry is the only per-map dimension. Three-read-site rule for difficulty is unaffected.
+- **Rationale**: Mirrors iter-3 #20 difficulty pattern at every architectural level (file-scope persistence, pure-helper cycle, edge-only input, selector-first VBlank scheduling). Preserves all existing budgets (ROM, BG-write/frame, OAM, modal precedence). Map-agnostic waves/towers keeps scope tight.
+- **Alternatives**: 
+  - Combined diff+map selector with one widget toggling axis ( more render code, no UX win).rejected 
+  - Per-map wave script ( explodes balancing surface).rejected 
+  - Bit-packed buildable bitmap to save 680 bytes ROM ( refactors hot `map_class_at` for a saving the 32 KB cap doesn't need).rejected 
+  - `map_load(void)` reading `game_active_map()` internally ( would force `map.c` to depend on `game.h`, breaking host-test linkability).rejected 
+
+- Iter-3 #17 F1: Compile-time + host-test guard for MAP_SELECT_COUNT / MAP_COUNT sync. `#error` in `src/title.c` (after includes pull in both `map.h` via `game.h` and `map_select.h`) catches drift at ROM build; `CHECK_EQ(MAP_SELECT_COUNT, MAP_COUNT)` in `tests/test_maps.c` catches drift on host-test build. Negative regression verified: setting `MAP_SELECT_COUNT 4u` fails build with the `#error` and `just test` reports the assertion failure.

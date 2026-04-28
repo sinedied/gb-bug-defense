@@ -128,6 +128,14 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc -Ires \
        tests/test_towers.c src/towers.c -o "{{BUILD}}/test_towers"
     "{{BUILD}}/test_towers"
+    # test_maps (iter-3 #17) exercises map_select.h cycle wrap and
+    # validates the three map classmaps + waypoint lists. Pulls
+    # res/assets.c for the gameplayN_* symbols (mirrors test_enemies/
+    # test_towers). map.h is read for typedef + constants only — the
+    # test owns its own registry mirroring src/map.c's table.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc -Ires \
+       tests/test_maps.c res/assets.c -o "{{BUILD}}/test_maps"
+    "{{BUILD}}/test_maps"
 
 # Build + launch emulator (one-command playtest)
 #

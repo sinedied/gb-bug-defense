@@ -541,3 +541,73 @@ DMG / mGBA). Run them after any change to `src/music.c` or
 3. **Expected**: The enemy is stunned, then walks freely for at least
    ~60 frames, then may be stunned again. It must not be locked in
    place indefinitely. (Stacking EMPs is  see spec L269-276.)wasteful 
+
+## Iter-3 # Maps & map-select scenarios17 
+
+### Scenario 17: Cold-boot defaults (Maps)
+1. Power-on the emulator, observe title screen.
+2. **Expected**: Difficulty selector at row 10 shows `< NORMAL >`,
+   map selector at row 12 shows `< MAP 1 >`, focus chevron `>` at
+   (col 3, row 10), `PRESS START` blinking on row 13.
+
+### Scenario 18: UP/DOWN toggles focus
+1. From cold-boot title, press DOWN, then UP, then DOWN.
+2. **Expected**: After DOWN, chevron at (3, 12); after UP, chevron at
+   (3, 10); after DOWN again, (3, 12). No other tiles change. UP/DOWN
+   are edge-only (holding does not auto-repeat).
+
+### Scenario 19: LEFT/RIGHT routes by focus
+1. From cold-boot title (focus=difficulty), press RIGHT.
+2. **Expected**: Difficulty becomes `< HARD >`. Map row unchanged.
+3. Press DOWN to move focus to map row, then press RIGHT.
+4. **Expected**: Map becomes `< MAP 2 >`. Difficulty row unchanged.
+
+### Scenario 20: Map cycle wraps
+1. With focus=map, press LEFT three times in succession.
+ `MAP 1`. Symmetrically,
+ `MAP 1`.
+
+### Scenario 21: Map persists across game-over
+1. Cycle to `MAP 2`, press START, lose the run (let HP reach 0),
+   press START on the game-over screen to return to title.
+2. **Expected**: Title shows `< MAP 2 >` retained; pressing START
+   loads Map 2 again. Difficulty is also retained (regression check
+   for iter-3 #20 D6).
+
+### Scenario 22: Power-on resets selection
+1. Set difficulty=HARD, map=MAP 3, START a session, then power-cycle
+   the emulator (close + relaunch).
+2. **Expected**: Title shows `< NORMAL >`, `< MAP 1 >` (cold-boot
+   defaults; SRAM persistence is feature #19, not yet shipped).
+
+### Scenario 23: Maps 2 and 3 play correctly
+1. Pick MAP 2, press START.
+2. **Expected**: BG matches design doc Map 2 (path enters at (0,1),
+   maze-shaped). Spawned bug walks every waypoint and arrives at
+   the computer cluster (HP decrements on arrival).
+3. Quit to title, pick MAP 3, press START.
+4. **Expected**: BG matches design doc Map 3 (short, near-horizontal
+   trunk with one dip). Bug reaches the computer noticeably faster
+   than Map 1 under the same wave-1 timings.
+
+### Scenario 24: Towers/cursor still gated by ground on all maps
+1. On Map 3, move cursor onto a path tile and press A.
+2. **Expected**: Placement rejected (shade-1 brackets + 2 Hz blink).
+   Move to a ground tile and press A: placement succeeds.
+
+### Scenario 25: Computer corruption progression on all maps
+1. On Map 2, take damage to drop HP to 1.
+2. **Expected**: Computer cluster cycles through corruption states
+4 exactly as on Map 1 (iter-3 #21 unchanged; cluster anchor at
+   (18, 4) for all three maps).
+
+### Scenario 26: Pause works on all maps
+1. While playing Map 2 or Map 3, press START.
+2. **Expected**: Pause overlay anchored at (48, 64) regardless of
+   map (iter-3 #22 unchanged).
+
+### Scenario 27: Title BG-write budget
+1. Hold a D-pad direction on the title and observe selector + prompt.
+2. **Expected**: No tile flicker on selector or prompt during the
+   30-frame blink edge. `title_render` services one dirty flag per
+   frame (worst-case 12 writes).

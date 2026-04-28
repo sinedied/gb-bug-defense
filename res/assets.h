@@ -87,7 +87,21 @@ extern const unsigned char title_tilemap[20*18];
 extern const unsigned char win_tilemap[20*18];
 extern const unsigned char lose_tilemap[20*18];
 
-extern const unsigned char gameplay_tilemap[20*17];
-extern const unsigned char gameplay_classmap[20*17];
+/* Iter-3 #17: three selectable maps. Map 1 is the canonical replacement
+ * for the pre-iter-3-17 `gameplay_tilemap` / `gameplay_classmap` /
+ * waypoint set (Map 1 bytes are byte-identical to the legacy data).
+ * Plain `const` (NOT `static const`) so external linkage is preserved. */
+#include "map.h"   /* waypoint_t */
+
+extern const unsigned char gameplay1_tilemap[20*17];
+extern const unsigned char gameplay1_classmap[20*17];
+extern const unsigned char gameplay2_tilemap[20*17];
+extern const unsigned char gameplay2_classmap[20*17];
+extern const unsigned char gameplay3_tilemap[20*17];
+extern const unsigned char gameplay3_classmap[20*17];
+
+extern const waypoint_t gameplay1_waypoints[8];
+extern const waypoint_t gameplay2_waypoints[10];
+extern const waypoint_t gameplay3_waypoints[8];
 
 #endif

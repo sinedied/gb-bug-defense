@@ -184,3 +184,14 @@ enemy_t (including stun_timer) is private to enemies.c. Stun-applying code (curr
   - bool enemies_try_stun(u8 idx, u8 frames)  — returns true and sets timer iff alive and not already stunned
   - bool enemies_is_stunned(u8 idx)           — read-only
 Direct enemy_t access from outside enemies.c is forbidden.
+
+### Iter-3 #17 conventions (2026-04- Maps & map selector28) 
+- **Map registry**: `s_maps[MAP_COUNT]` in `src/map.c`. External code reaches it ONLY via the public API (`map_load(id)`, `map_class_at`, `map_waypoints`, `map_waypoint_count`, `map_active`, `map_set_computer_state`). Direct reads of `s_maps` from outside `map.c` are forbidden. `map.c` may NOT include `game. the active id is passed in as `map_load`'s argument.h` 
+- **map_load contract** (extended): caller MUST bracket with DISPLAY_OFF/ON (writes ~340 BG tiles, larger than a VBlank window). `map_load` ALSO resets the iter-3 #21 corruption tracking (`s_state = 0; s_state_dirty = 0;`).
+- **Active-map persistence**: `static u8 s_active_map` in `src/game.c`. Read via `game_active_map()`, write via `game_set_active_map(u8)` (clamps `< MAP_COUNT`). NOT reset in state transitions; power-on default = MAP_1 via `.data` zero-init.
+- **`WAYPOINT_COUNT` is deprecated**. Use `map_waypoint_count()`. Any new code that needs the count of the active map's waypoints MUST go through the accessor, never a compile-time macro. `MAX_WAYPOINTS` (=10) is a designer cap on the largest map; not a per-map count.
+- **Title-screen UI**: two stacked selectors + one-tile focus chevron at (FOCUS_COL=3, focused_row). UP/DOWN edge-only toggles `s_title_focus`; LEFT/RIGHT edge-only cycles the focused selector. The single-D-pad-press exemption (no auto-repeat for short cycles) covers UP/DOWN as well as LEFT/RIGHT.
+- **Title BG-write priority chain** (extends iter-3 #20): service ONE dirty per frame in priority order `s_diff_dirty` > `s_map_dirty` > `s_focus_dirty` > `s_dirty` (prompt blink). Each branch returns after clearing its flag. Cap = 12 writes/frame, well inside the 16-write budget.
+- **Computer position is map-local**: `map_render` reads `computer_tx/ty` from the active map_def. The previous literal `(18, sr)`/`(19, sr+1)` block in `src/map.c::map_render` is forbidden. (Today all 3 maps still land at (18, 4), so a sloppy refactor would visually pass; this convention is the guard.)
+- **Wave/stat invariance across maps**: when adding maps, do NOT add per-map fields for spawn delays, wave overrides, energy multipliers, etc. Wave script and difficulty constants are shared; path geometry is the only per-map dimension.
+- **Asset emission for new map data** (gen_assets.py): tilemap/classmap/waypoint arrays are emitted as plain `const` (NOT `static const`) so `src/map.c` can reference them via `extern` decls in `res/assets.h`. `assets.h` `#include`s `src/map.h` for the `waypoint_t` typedef. Subsequent maps follow the `gameplayN_*` naming pattern.

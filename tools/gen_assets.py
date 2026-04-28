@@ -914,32 +914,37 @@ TC_GROUND   = 0
 TC_PATH     = 1
 TC_COMPUTER = 2
 
-def gameplay_map():
-    # Class grid: 20 cols x 17 rows.
+def build_map(path_segments, computer_tl):
+    """Generic map builder.
+    path_segments: list of ('h', x0, x1, y) | ('v', x, y0, y1) ; both endpoints
+                   are inclusive. Computer cluster cells inside a path segment
+                   are reclassified as TC_COMPUTER (path enters cluster at the
+                   terminal waypoint).
+    computer_tl: (cx, cy) top-left of the 2x2 computer cluster.
+    Returns (tile_grid, class_grid).
+    """
     class_grid = [[TC_GROUND]*20 for _ in range(17)]
 
     def set_path(x, y):
         class_grid[y][x] = TC_PATH
 
-    # Top horizontal: pf row 2, cols 0..15 (waypoint goes 0->8 then 8->8 down).
-    # We need: (-1,2)->(0,2)->(8,2): top row from col 0 to col 8.
-    # (8,2)->(8,9): col 8 from row 2 to row 9.
-    # (8,9)->(15,9): row 9 from col 8 to col 15.
-    # (15,9)->(15,5): col 15 from row 5 to row 9.
-    # (15,5)->(17,5): row 5 from col 15 to col 17.
-    # (17,5)->(18,5): final tile entering the computer.
-    for c in range(0, 9):  set_path(c, 2)
-    for r in range(2, 10): set_path(8, r)
-    for c in range(8, 16): set_path(c, 9)
-    for r in range(5, 10): set_path(15, r)
-    for c in range(15, 18): set_path(c, 5)
+    for seg in path_segments:
+        if seg[0] == 'h':
+            _, x0, x1, y = seg
+            lo, hi = (x0, x1) if x0 <= x1 else (x1, x0)
+            for c in range(lo, hi + 1):
+                set_path(c, y)
+        else:
+            _, x, y0, y1 = seg
+            lo, hi = (y0, y1) if y0 <= y1 else (y1, y0)
+            for r in range(lo, hi + 1):
+                set_path(x, r)
 
-    # Computer occupies pf rows 4..5, cols 18..19.
-    for r in range(4, 6):
-        for c in range(18, 20):
+    cx, cy = computer_tl
+    for r in range(cy, cy + 2):
+        for c in range(cx, cx + 2):
             class_grid[r][c] = TC_COMPUTER
 
-    # Tile grid mirrors class grid choosing visual tile.
     tile_grid = [[TILE_GROUND_IDX]*20 for _ in range(17)]
     for r in range(17):
         for c in range(20):
@@ -948,15 +953,73 @@ def gameplay_map():
                 tile_grid[r][c] = TILE_PATH_IDX
             elif cls == TC_GROUND:
                 tile_grid[r][c] = TILE_GROUND_IDX
-    # Computer 2x2.
-    tile_grid[4][18] = TILE_COMP_TL_IDX
-    tile_grid[4][19] = TILE_COMP_TR_IDX
-    tile_grid[5][18] = TILE_COMP_BL_IDX
-    tile_grid[5][19] = TILE_COMP_BR_IDX
+    tile_grid[cy    ][cx    ] = TILE_COMP_TL_IDX
+    tile_grid[cy    ][cx + 1] = TILE_COMP_TR_IDX
+    tile_grid[cy + 1][cx    ] = TILE_COMP_BL_IDX
+    tile_grid[cy + 1][cx + 1] = TILE_COMP_BR_IDX
 
     return tile_grid, class_grid
 
-GAMEPLAY_TILES, GAMEPLAY_CLASS = gameplay_map()
+
+# ---------------------------------------------------------------------------
+# Map definitions — see specs/iter3-17-maps-design.md for ASCII grids.
+# Waypoint lists are translated literally from the design doc; build_map()
+# segments mirror those waypoints (every consecutive pair is purely H or V
+# and endpoints inclusive).
+# ---------------------------------------------------------------------------
+
+# Map 1 — reference. MUST stay byte-identical to the pre-iter-3-17
+# `gameplay_tilemap` / `gameplay_classmap` output.
+MAP1_WAYPOINTS = [
+    (-1, 2), (0, 2), (8, 2), (8, 9),
+    (15, 9), (15, 5), (17, 5), (18, 5),
+]
+MAP1_SEGMENTS = [
+    ('h', 0, 8, 2),
+    ('v', 8, 2, 9),
+    ('h', 8, 15, 9),
+    ('v', 15, 5, 9),
+    ('h', 15, 17, 5),
+    ('h', 17, 18, 5),  # terminal — last cell is computer cluster
+]
+MAP1_COMPUTER = (18, 4)
+
+# Map 2 — Maze (10 waypoints — at the budget cap)
+MAP2_WAYPOINTS = [
+    (-1, 1), (0, 1), (4, 1), (4, 4),
+    (2, 4), (2, 8), (11, 8), (11, 5),
+    (17, 5), (18, 5),
+]
+MAP2_SEGMENTS = [
+    ('h', 0, 4, 1),
+    ('v', 4, 1, 4),
+    ('h', 2, 4, 4),
+    ('v', 2, 4, 8),
+    ('h', 2, 11, 8),
+    ('v', 11, 5, 8),
+    ('h', 11, 17, 5),
+    ('h', 17, 18, 5),  # terminal
+]
+MAP2_COMPUTER = (18, 4)
+
+# Map 3 — Sprint (8 waypoints, short near-horizontal)
+MAP3_WAYPOINTS = [
+    (-1, 5), (0, 5), (7, 5), (7, 7),
+    (14, 7), (14, 5), (17, 5), (18, 5),
+]
+MAP3_SEGMENTS = [
+    ('h', 0, 7, 5),
+    ('v', 7, 5, 7),
+    ('h', 7, 14, 7),
+    ('v', 14, 5, 7),
+    ('h', 14, 17, 5),
+    ('h', 17, 18, 5),  # terminal
+]
+MAP3_COMPUTER = (18, 4)
+
+GAMEPLAY1_TILES, GAMEPLAY1_CLASS = build_map(MAP1_SEGMENTS, MAP1_COMPUTER)
+GAMEPLAY2_TILES, GAMEPLAY2_CLASS = build_map(MAP2_SEGMENTS, MAP2_COMPUTER)
+GAMEPLAY3_TILES, GAMEPLAY3_CLASS = build_map(MAP3_SEGMENTS, MAP3_COMPUTER)
 
 # ----------------------------------------------------------------------------
 # Emit C source.
@@ -976,11 +1039,22 @@ def emit_tile_array(name, tiles_bytes_list):
     lines.append("};")
     return "\n".join(lines)
 
-def emit_u8_grid(name, grid):
+def emit_u8_grid(name, grid, sized=False):
     rows = []
     for row in grid:
         rows.append("    " + ", ".join(str(v) for v in row) + ",")
-    return "const unsigned char %s[] = {\n%s\n};" % (name, "\n".join(rows))
+    if sized:
+        n = len(grid) * (len(grid[0]) if grid else 0)
+        decl = "const unsigned char %s[%d]" % (name, n)
+    else:
+        decl = "const unsigned char %s[]" % name
+    return "%s = {\n%s\n};" % (decl, "\n".join(rows))
+
+def emit_waypoints(name, waypoints):
+    """Emit a waypoint_t array. Plain `const` (NOT `static const`) so map.c
+    can reference it via an `extern` declaration in res/assets.h."""
+    body = ", ".join("{ %d, %d }" % (tx, ty) for (tx, ty) in waypoints)
+    return "const waypoint_t %s[%d] = { %s };" % (name, len(waypoints), body)
 
 assets_h = """\
 /* Auto-generated by tools/gen_assets.py — do not edit by hand. */
@@ -1072,8 +1146,22 @@ extern const unsigned char title_tilemap[20*18];
 extern const unsigned char win_tilemap[20*18];
 extern const unsigned char lose_tilemap[20*18];
 
-extern const unsigned char gameplay_tilemap[20*17];
-extern const unsigned char gameplay_classmap[20*17];
+/* Iter-3 #17: three selectable maps. Map 1 is the canonical replacement
+ * for the pre-iter-3-17 `gameplay_tilemap` / `gameplay_classmap` /
+ * waypoint set (Map 1 bytes are byte-identical to the legacy data).
+ * Plain `const` (NOT `static const`) so external linkage is preserved. */
+#include "map.h"   /* waypoint_t */
+
+extern const unsigned char gameplay1_tilemap[20*17];
+extern const unsigned char gameplay1_classmap[20*17];
+extern const unsigned char gameplay2_tilemap[20*17];
+extern const unsigned char gameplay2_classmap[20*17];
+extern const unsigned char gameplay3_tilemap[20*17];
+extern const unsigned char gameplay3_classmap[20*17];
+
+extern const waypoint_t gameplay1_waypoints[8];
+extern const waypoint_t gameplay2_waypoints[10];
+extern const waypoint_t gameplay3_waypoints[8];
 
 #endif
 """
@@ -1102,9 +1190,21 @@ assets_c.append(emit_u8_grid("win_tilemap", win_map()))
 assets_c.append("")
 assets_c.append(emit_u8_grid("lose_tilemap", lose_map()))
 assets_c.append("")
-assets_c.append(emit_u8_grid("gameplay_tilemap", GAMEPLAY_TILES))
+assets_c.append(emit_u8_grid("gameplay1_tilemap",  GAMEPLAY1_TILES, sized=True))
 assets_c.append("")
-assets_c.append(emit_u8_grid("gameplay_classmap", GAMEPLAY_CLASS))
+assets_c.append(emit_u8_grid("gameplay1_classmap", GAMEPLAY1_CLASS, sized=True))
+assets_c.append("")
+assets_c.append(emit_u8_grid("gameplay2_tilemap",  GAMEPLAY2_TILES, sized=True))
+assets_c.append("")
+assets_c.append(emit_u8_grid("gameplay2_classmap", GAMEPLAY2_CLASS, sized=True))
+assets_c.append("")
+assets_c.append(emit_u8_grid("gameplay3_tilemap",  GAMEPLAY3_TILES, sized=True))
+assets_c.append("")
+assets_c.append(emit_u8_grid("gameplay3_classmap", GAMEPLAY3_CLASS, sized=True))
+assets_c.append("")
+assets_c.append(emit_waypoints("gameplay1_waypoints", MAP1_WAYPOINTS))
+assets_c.append(emit_waypoints("gameplay2_waypoints", MAP2_WAYPOINTS))
+assets_c.append(emit_waypoints("gameplay3_waypoints", MAP3_WAYPOINTS))
 assets_c.append("")
 
 with open(os.path.join(OUT_DIR, "assets.h"), "w") as f:

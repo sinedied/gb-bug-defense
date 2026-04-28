@@ -26,4 +26,9 @@ u8   game_anim_frame(void);
 u8   game_difficulty(void);
 void game_set_difficulty(u8 d);
 
+/* Iter-3 #17: active map id (0..MAP_COUNT-1). Same persistence model
+ * as s_difficulty. Setter is a no-op for m >= MAP_COUNT. */
+u8   game_active_map(void);
+void game_set_active_map(u8 m);
+
 #endif

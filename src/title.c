@@ -4,7 +4,12 @@
 #include "input.h"
 #include "game.h"
 #include "difficulty_calc.h"
+#include "map_select.h"
 #include <gb/gb.h>
+
+#if MAP_SELECT_COUNT != MAP_COUNT
+#error "MAP_SELECT_COUNT must equal MAP_COUNT - update src/map_select.h"
+#endif
 
 /* "PRESS START" prompt blink: toggle row 13 cols 4..15 (12 tiles) every
  * 30 frames between glyph indices and blank (tile 32 = space).
@@ -17,7 +22,14 @@
  * 5..14 (10 tiles). Independent dirty flag so cycling does not disturb
  * the PRESS-START blink path. Title screen owns NO game state — the
  * current selection comes from `game_difficulty()`; LEFT/RIGHT writes
- * back via `game_set_difficulty()`. Edge-only input (D9). */
+ * back via `game_set_difficulty()`. Edge-only input (D9).
+ *
+ * Iter-3 #17: second selector row at row 12 (`< MAP N >`) plus a
+ * focus chevron `>` at column 3 of the focused row. UP/DOWN
+ * (edge-only) toggles `s_title_focus`; LEFT/RIGHT cycles the focused
+ * selector. Service order in title_render is one-per-frame, priority
+ * `s_diff_dirty > s_map_dirty > s_focus_dirty > s_dirty`. Worst case
+ * is 12 BG writes/frame (≤ 16 cap). */
 
 #define PROMPT_ROW 13
 #define PROMPT_COL  4
@@ -27,12 +39,29 @@
 #define DIFF_COL    5
 #define DIFF_W     10
 
+#define MAP_ROW    12
+#define MAP_COL     5
+#define MAP_W      10
+
+#define FOCUS_COL   3
+
 static u8   s_blink;
 static bool s_visible;
 static bool s_dirty;
 static u8   s_diff_dirty;
+static u8   s_map_dirty;
+static u8   s_focus_dirty;
+static u8   s_title_focus;     /* 0 = difficulty, 1 = map */
 static const char s_prompt[PROMPT_LEN + 1] = "PRESS START ";
 static const char *const s_diff_labels[3] = { " EASY ", "NORMAL", " HARD " };
+static const char *const s_map_labels[3]  = { "MAP 1 ", "MAP 2 ", "MAP 3 " };
+
+static u8 focused_row(void) {
+    return (s_title_focus == 0) ? DIFF_ROW : MAP_ROW;
+}
+static u8 unfocused_row(void) {
+    return (s_title_focus == 0) ? MAP_ROW : DIFF_ROW;
+}
 
 static void draw_prompt_now(bool visible) {
     u8 i;
@@ -42,17 +71,31 @@ static void draw_prompt_now(bool visible) {
     }
 }
 
-static void draw_diff_now(void) {
-    /* Layout: '<', ' ', label[0..5] (6 chars), ' ', '>'  -> 10 tiles. */
-    const char *label = s_diff_labels[game_difficulty()];
+/* Layout: '<', ' ', label[0..5] (6 chars), ' ', '>'  -> 10 tiles. */
+static void draw_selector(u8 col, u8 row, const char *label) {
     u8 i;
-    set_bkg_tile_xy(DIFF_COL + 0, DIFF_ROW, (u8)'<');
-    set_bkg_tile_xy(DIFF_COL + 1, DIFF_ROW, (u8)' ');
+    set_bkg_tile_xy(col + 0, row, (u8)'<');
+    set_bkg_tile_xy(col + 1, row, (u8)' ');
     for (i = 0; i < 6; i++) {
-        set_bkg_tile_xy(DIFF_COL + 2 + i, DIFF_ROW, (u8)label[i]);
+        set_bkg_tile_xy(col + 2 + i, row, (u8)label[i]);
     }
-    set_bkg_tile_xy(DIFF_COL + 8, DIFF_ROW, (u8)' ');
-    set_bkg_tile_xy(DIFF_COL + 9, DIFF_ROW, (u8)'>');
+    set_bkg_tile_xy(col + 8, row, (u8)' ');
+    set_bkg_tile_xy(col + 9, row, (u8)'>');
+}
+
+static void draw_diff_now(void) {
+    draw_selector(DIFF_COL, DIFF_ROW, s_diff_labels[game_difficulty()]);
+}
+
+static void draw_map_now(void) {
+    draw_selector(MAP_COL, MAP_ROW, s_map_labels[game_active_map()]);
+}
+
+static void draw_focus_now(void) {
+    /* Two writes: clear the unfocused row's chevron cell, paint '>'
+     * at the focused row's chevron cell. */
+    set_bkg_tile_xy(FOCUS_COL, unfocused_row(), (u8)' ');
+    set_bkg_tile_xy(FOCUS_COL, focused_row(),   (u8)'>');
 }
 
 void title_enter(void) {
@@ -64,23 +107,45 @@ void title_enter(void) {
     s_blink = 0;
     s_visible = true;
     s_dirty = false;
+    s_title_focus = 0;       /* D12: reset focus to difficulty on entry */
+    s_diff_dirty = 0;
+    s_map_dirty = 0;
+    s_focus_dirty = 0;
     draw_prompt_now(true);
     draw_diff_now();
-    s_diff_dirty = 0;
+    draw_map_now();
+    draw_focus_now();
     DISPLAY_ON;
 }
 
 void title_update(void) {
     /* Iter-3 #20: edge-only LEFT/RIGHT cycle with wrap. Uses
      * `input_is_pressed` (NOT `input_is_repeat`) — the 3-state cycle
-     * is too short for auto-repeat to feel right. See conventions
-     * "Iter-3 #20 conventions" → title-selector input rule. */
-    if (input_is_pressed(J_LEFT)) {
-        game_set_difficulty(difficulty_cycle_left(game_difficulty()));
-        s_diff_dirty = 1;
+     * is too short for auto-repeat to feel right.
+     *
+     * Iter-3 #17: UP/DOWN (edge-only) toggles `s_title_focus`;
+     * LEFT/RIGHT routes to whichever selector currently owns focus.
+     * Branches are mutually exclusive (single `if/else if` chain) so
+     * a single frame never both moves focus and cycles a selector. */
+    if (input_is_pressed(J_UP) || input_is_pressed(J_DOWN)) {
+        s_title_focus ^= 1u;
+        s_focus_dirty = 1;
+    } else if (input_is_pressed(J_LEFT)) {
+        if (s_title_focus == 0) {
+            game_set_difficulty(difficulty_cycle_left(game_difficulty()));
+            s_diff_dirty = 1;
+        } else {
+            game_set_active_map(map_cycle_left(game_active_map()));
+            s_map_dirty = 1;
+        }
     } else if (input_is_pressed(J_RIGHT)) {
-        game_set_difficulty(difficulty_cycle_right(game_difficulty()));
-        s_diff_dirty = 1;
+        if (s_title_focus == 0) {
+            game_set_difficulty(difficulty_cycle_right(game_difficulty()));
+            s_diff_dirty = 1;
+        } else {
+            game_set_active_map(map_cycle_right(game_active_map()));
+            s_map_dirty = 1;
+        }
     }
 
     s_blink++;
@@ -91,16 +156,26 @@ void title_update(void) {
 }
 
 void title_render(void) {
-    /* VBlank BG-write budget is 16 writes/frame (see conventions
-     * iter-2 + iter-3 #21). Servicing both dirty regions in the
-     * same frame would emit 10 (selector) + 12 (prompt) = 22 writes
-     * and corrupt tiles past the VBlank window on real DMG. Service
-     * the user-visible selector first (responds to LEFT/RIGHT this
-     * frame) and defer the blink to the next frame — the blink is
-     * a 30-frame periodic toggle, so a 1-frame slip is invisible. */
+    /* VBlank BG-write budget is 16 writes/frame. Service ONE dirty
+     * flag per frame in priority order, returning after each so the
+     * worst-case write count is the heaviest single branch (12 for
+     * the prompt blink; 10 for either selector; 2 for focus). The
+     * blink is a 30-frame periodic toggle, so multi-frame slip is
+     * invisible. (Iter-3 #20 selector-first, blink-deferred convention
+     * extended to four flags.) */
     if (s_diff_dirty) {
         draw_diff_now();
         s_diff_dirty = 0;
+        return;
+    }
+    if (s_map_dirty) {
+        draw_map_now();
+        s_map_dirty = 0;
+        return;
+    }
+    if (s_focus_dirty) {
+        draw_focus_now();
+        s_focus_dirty = 0;
         return;
     }
     if (s_dirty) {
