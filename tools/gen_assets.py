@@ -843,6 +843,18 @@ TITLE_TW_B = design_tile([
     "........",
 ])
 
+# Iter-5: Arrow tile for title menu selector focus indicator.
+TILE_ARROW_ART = design_tile([
+    "........",
+    ".##.....",
+    ".####...",
+    ".#####..",
+    ".#####..",
+    ".####...",
+    ".##.....",
+    "........",
+])
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -901,6 +913,8 @@ map_tiles = [
     ('TILE_TITLE_BUG_B', TITLE_BUG_B),
     ('TILE_TITLE_TW_T',  TITLE_TW_T),
     ('TILE_TITLE_TW_B',  TITLE_TW_B),
+    # Iter-5: Arrow tile for title selector focus.
+    ('TILE_ARROW',       TILE_ARROW_ART),
 ]
 
 # ----------------------------------------------------------------------------
@@ -1252,6 +1266,7 @@ TITLE_BUG_T_IDX = MAP_TILE_BASE + 48
 TITLE_BUG_B_IDX = MAP_TILE_BASE + 49
 TITLE_TW_T_IDX  = MAP_TILE_BASE + 50
 TITLE_TW_B_IDX  = MAP_TILE_BASE + 51
+TILE_ARROW_IDX  = MAP_TILE_BASE + 52
 
 def title_map():
     S = 32
@@ -1283,7 +1298,6 @@ def title_map():
     rows[7]  = [S,S,S,S, BG_B, S,S,S,    S, CB,CX, S, S,S,S,    TW_B, S,S,S,S]
     # --- UI area (rows 10-17, selectors overwritten at runtime) ---
     rows[13] = text_row("    PRESS START     ")
-    rows[16] = text_row("    (C) 2025 GBTD   ")
     return rows
 
 def win_map():
@@ -1522,7 +1536,8 @@ assets_h = """\
 #define TILE_TITLE_BUG_B  (MAP_TILE_BASE + 49)
 #define TILE_TITLE_TW_T   (MAP_TILE_BASE + 50)
 #define TILE_TITLE_TW_B   (MAP_TILE_BASE + 51)
-#define MAP_TILE_COUNT  52
+#define TILE_ARROW        (MAP_TILE_BASE + 52)
+#define MAP_TILE_COUNT  53
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1

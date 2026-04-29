@@ -61,7 +61,8 @@
 #define TILE_TITLE_BUG_B  (MAP_TILE_BASE + 49)
 #define TILE_TITLE_TW_T   (MAP_TILE_BASE + 50)
 #define TILE_TITLE_TW_B   (MAP_TILE_BASE + 51)
-#define MAP_TILE_COUNT  52
+#define TILE_ARROW        (MAP_TILE_BASE + 52)
+#define MAP_TILE_COUNT  53
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1

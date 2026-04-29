@@ -19,32 +19,32 @@
  * dirty flag; title_render() does the actual BG writes during the
  * VBlank window scheduled by main().
  *
- * Iter-3 #20 difficulty selector: BG-only `< LABEL >` at row 10 cols
- * 5..15 (11 tiles). Independent dirty flag so cycling does not disturb
+ * Iter-3 #20 difficulty selector: BG-only label at row 10 cols
+ * 7..13 (7 tiles). Independent dirty flag so cycling does not disturb
  * the PRESS-START blink path. Title screen owns NO game state — the
  * current selection comes from `game_difficulty()`; LEFT/RIGHT writes
  * back via `game_set_difficulty()`. Edge-only input (D9).
  *
- * Iter-3 #17: second selector row at row 12 (`< MAP N >`) plus a
- * focus chevron `>` at column 3 of the focused row. UP/DOWN
- * (edge-only) toggles `s_title_focus`; LEFT/RIGHT cycles the focused
- * selector. Service order in title_render is one-per-frame, priority
- * `s_diff_dirty > s_map_dirty > s_focus_dirty > s_dirty`. Worst case
- * is 12 BG writes/frame (≤ 16 cap). */
+ * Iter-3 #17: second selector row at row 12 (label only) plus a
+ * filled-triangle arrow tile (TILE_ARROW) at column 5 of the focused
+ * row. UP/DOWN (edge-only) toggles `s_title_focus`; LEFT/RIGHT cycles
+ * the focused selector. Service order in title_render is one-per-frame,
+ * priority `s_diff_dirty > s_map_dirty > s_focus_dirty > s_dirty`.
+ * Worst case is 12 BG writes/frame (≤ 16 cap). */
 
 #define PROMPT_ROW 13
 #define PROMPT_COL  4
 #define PROMPT_LEN 12
 
 #define DIFF_ROW   10
-#define DIFF_COL    5
-#define DIFF_W     11
+#define DIFF_COL    7
+#define DIFF_W      7
 
 #define MAP_ROW    12
-#define MAP_COL     5
-#define MAP_W      11
+#define MAP_COL     7
+#define MAP_W       7
 
-#define FOCUS_COL   3
+#define FOCUS_COL   5
 
 /* Iter-3 #19: HI line at row 15 cols 5..13 (9 tiles). Static, recomputed
  * when difficulty or map cycles. Inserted in the priority chain
@@ -80,16 +80,12 @@ static void draw_prompt_now(bool visible) {
     }
 }
 
-/* Layout: '<', ' ', label[0..6] (7 chars), ' ', '>'  -> 11 tiles. */
+/* Layout: label[0..6] (7 chars) at cols 7–13. */
 static void draw_selector(u8 col, u8 row, const char *label) {
     u8 i;
-    set_bkg_tile_xy(col + 0, row, (u8)'<');
-    set_bkg_tile_xy(col + 1, row, (u8)' ');
     for (i = 0; i < 7; i++) {
-        set_bkg_tile_xy(col + 2 + i, row, (u8)label[i]);
+        set_bkg_tile_xy(col + i, row, (u8)label[i]);
     }
-    set_bkg_tile_xy(col + 9, row, (u8)' ');
-    set_bkg_tile_xy(col + 10, row, (u8)'>');
 }
 
 static void draw_diff_now(void) {
@@ -101,10 +97,10 @@ static void draw_map_now(void) {
 }
 
 static void draw_focus_now(void) {
-    /* Two writes: clear the unfocused row's chevron cell, paint '>'
-     * at the focused row's chevron cell. */
+    /* Two writes: clear the unfocused row's arrow cell, paint TILE_ARROW
+     * at the focused row's arrow cell. */
     set_bkg_tile_xy(FOCUS_COL, unfocused_row(), (u8)' ');
-    set_bkg_tile_xy(FOCUS_COL, focused_row(),   (u8)'>');
+    set_bkg_tile_xy(FOCUS_COL, focused_row(),   (u8)TILE_ARROW);
 }
 
 /* Iter-3 #19: paint `HI: NNNNN` at row 15 cols 5..13. 9 writes total.
@@ -196,7 +192,7 @@ void title_render(void) {
     /* VBlank BG-write budget is 16 writes/frame. Service ONE dirty
      * flag per frame in priority order, returning after each so the
      * worst-case write count is the heaviest single branch (12 for
-     * the prompt blink; 11 for either selector; 2 for focus). The
+     * the prompt blink; 7 for either selector; 2 for focus). The
      * blink is a 30-frame periodic toggle, so multi-frame slip is
      * invisible. (Iter-3 #20 selector-first, blink-deferred convention
      * extended to four flags.) */
