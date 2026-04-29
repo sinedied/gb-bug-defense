@@ -658,3 +658,17 @@
 - **Decision**: Accept the 18-write edge case as cosmetic-only risk. No mitigation.
 - **Rationale**: This requires simultaneous SELECT+A on the single gate-lift frame — a once-per-session event with near-zero probability of accidental occurrence. On DMG hardware, 2 excess writes would land at the start of the next scanline causing a single-frame tile flicker (2 tiles). The complexity of deferring the HUD write or blocking SELECT on that frame outweighs the cosmetic cost.
 - **Alternatives**: Defer fast-indicator HUD write to next frame when gate lifts (rejected — adds state tracking complexity for a 1-frame cosmetic fix); block SELECT during gate-active (rejected — user expects toggle to work immediately; contradicts acceptance scenario 7).
+
+### Iter-4 #31: Range preview = new `range_preview.{h,c}` module + `range_calc.h` pure helper
+- **Date**: 2026-06-14
+- **Context**: Feature #31 — tower range preview as 8 dot sprites in a circle.
+- **Decision**: New module `src/range_preview.{h,c}` owns the preview lifecycle (dwell timer, visibility, OAM 1..8 management). Pure helper `src/range_calc.h` (header-only, `<stdint.h>`) contains circle-point computation using `/64` division (not `>>6` shift) for signed-portability. `range_calc_dot()` returns screen-pixel center coordinates; range_preview.c applies GB OAM centering transform (`+4, +12`). Arrival frame is excluded from dwell count (step 2 returns early). `RANGE_DWELL_FRAMES=15` in tuning.h. `menu_open()` and `pause_open()` call `range_preview_hide()`.
+- **Rationale**: Separate module follows pause.c/menu.c pattern (own state + OAM management is too much for game.c). Pure helper enables host testing. `/64` division avoids implementation-defined signed right-shift. Pixel-center return keeps helper GB-agnostic. Arrival-frame exclusion gives cleaner transition/dwell separation.
+- **Alternatives**: Inline in game.c (rejected — too much state); `>>6` shift (rejected — implementation-defined for negatives); return OAM coords from helper (rejected — ties helper to GB hardware, harder to test).
+
+### Iter-4 #31 bugfix: range_calc_dot sentinel changed from (0,0) to (255,255)
+- **Date**: 2026-06-14
+- **Context**: `range_calc_dot()` returned `{0, 0}` as a "hidden/off-screen" sentinel. But `(0, 0)` is a valid screen pixel coordinate (e.g., FW tower at tile (3,2) with range 40px produces a dot at pixel (0,0) via the 225° angle). The caller in `range_preview.c` treated (0,0) as hidden, incorrectly hiding a valid dot.
+- **Decision**: Changed sentinel to `{255, 255}`. Updated `range_preview.c` check to `dot.x == 255 && dot.y == 255`. Added regression test T7 in `test_range_calc.c` verifying that `range_calc_dot(28, 28, 40, 5)` returns `{0, 0}` (valid dot, not hidden).
+- **Rationale**: 255 is always off-screen — GB screen is 160×144. No valid dot position can ever be (255, 255).
+- **Alternatives**: Use a separate `bool visible` field in the struct (rejected — increases struct size and changes all call sites); use a return-code + out-param pattern (rejected — more complex API for a simple sentinel).

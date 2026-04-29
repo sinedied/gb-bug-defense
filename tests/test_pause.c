@@ -68,15 +68,16 @@ bool input_is_repeat(u8 mask)  { return (s_repeat_mask & mask) != 0; }
 static bool s_menu_open_stub;
 bool menu_is_open(void) { return s_menu_open_stub; }
 
-/* Cursor / enemies / projectiles — no-op shims (pause.c calls them
- * for side effects we don't need to assert here; T1 verifies pause
- * OAM hiding directly). */
+/* Cursor / enemies / projectiles / range_preview — no-op shims (pause.c
+ * calls them for side effects we don't need to assert here; T1 verifies
+ * pause OAM hiding directly). */
 static int s_blink_pause_calls;
 static int s_enemies_hide_calls;
 static int s_proj_hide_calls;
 void cursor_blink_pause(bool paused)  { (void)paused; s_blink_pause_calls++; }
 void enemies_hide_all(void)           { s_enemies_hide_calls++; }
 void projectiles_hide_all(void)       { s_proj_hide_calls++; }
+void range_preview_hide(void)         { }
 
 /* music_duck stub — pause.c calls music_duck(1) on open and music_duck(0)
  * on close (D-MUS-4). The actual duck (NR50 write) is exercised in

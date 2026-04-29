@@ -98,4 +98,7 @@
 #define TOWER_EMP_COOLDOWN_L2 100
 #define TOWER_EMP_STUN_L2     120
 
+/* Iter-4 #31: range preview dwell threshold (frames). */
+#define RANGE_DWELL_FRAMES  15
+
 #endif /* GBTD_TUNING_H */

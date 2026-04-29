@@ -6,6 +6,7 @@
 #include "cursor.h"
 #include "audio.h"
 #include "economy.h"
+#include "range_preview.h"
 #include "assets.h"
 #include <gb/gb.h>
 
@@ -88,6 +89,7 @@ void menu_open(u8 idx) {
     s_bg_save_pending = 1;
     enemies_hide_all();
     projectiles_hide_all();
+    range_preview_hide();
     cursor_blink_pause(true);
     set_sprite_tile(OAM_CURSOR, SPR_CURSOR_A);
 }

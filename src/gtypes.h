@@ -39,6 +39,8 @@ typedef i16      fix8;          /* 8.8 fixed point */
 #define OAM_MENU_COUNT   16
 #define OAM_PAUSE_BASE    OAM_MENU_BASE   /* alias: pause shares OAM 1..16 */
 #define OAM_PAUSE_COUNT   OAM_MENU_COUNT
+#define OAM_RANGE_BASE  1   /* 1..8 — range preview dots; shares menu/pause OAM */
+#define OAM_RANGE_COUNT 8
 #define OAM_ENEMIES_BASE 17   /* 17..30 (14 slots) */
 #define OAM_PROJ_BASE    31   /* 31..38 (8 slots) — was 29..36 in MVP */
 #define OAM_TOTAL        40

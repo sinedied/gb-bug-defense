@@ -15,6 +15,7 @@
 #include "music.h"
 #include "menu.h"
 #include "pause.h"
+#include "range_preview.h"
 #include "save.h"
 #include "score.h"
 #include "game_modal.h"
@@ -123,6 +124,7 @@ static void enter_title(void) {
     projectiles_init();
     menu_init();
     pause_init();
+    range_preview_init();
     title_enter();
     /* Iter-3 #16: title theme. music_play is idempotent for the same
      * song, so re-entries (gameover -> title) don't restart the loop. */
@@ -146,6 +148,7 @@ static void enter_playing(void) {
     projectiles_init();
     menu_init();
     pause_init();
+    range_preview_init();
     s_fast_mode = false;   /* iter-4 #30: always start with normal speed */
     hud_init();
     /* Iter-4 #24: first-tower gate — paint text while display is off. */
@@ -253,6 +256,7 @@ static void playing_update(void) {
         menu_update();
     } else {
         cursor_update();
+        range_preview_update(cursor_tx(), cursor_ty());
         /* Iter-4 #30: Speed toggle — SELECT edge.  Implicit modal gate:
          * this code is unreachable when pause or menu is open. */
         if (input_is_pressed(J_SELECT)) {

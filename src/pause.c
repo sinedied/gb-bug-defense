@@ -5,6 +5,7 @@
 #include "enemies.h"
 #include "projectiles.h"
 #include "cursor.h"
+#include "range_preview.h"
 #include "assets.h"
 #include <gb/gb.h>
 
@@ -84,6 +85,7 @@ void pause_open(void) {
     s_quit_req = false;
     enemies_hide_all();
     projectiles_hide_all();
+    range_preview_hide();
     cursor_blink_pause(true);
     /* Hide the placement cursor entirely: it has no function while
      * paused and would burn an extra per-scanline sprite. */

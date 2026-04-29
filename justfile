@@ -178,6 +178,11 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Isrc \
        tests/test_gate.c -o "{{BUILD}}/test_gate"
     "{{BUILD}}/test_gate"
+    # test_range_calc (iter-4 #31) exercises the pure circle-dot helper
+    # in src/range_calc.h (header-only, <stdint.h> only — no GBDK linkage).
+    cc -std=c99 -Wall -Wextra -O2 -Isrc \
+       tests/test_range_calc.c -o "{{BUILD}}/test_range_calc"
+    "{{BUILD}}/test_range_calc"
 
 # Build + launch emulator (one-command playtest)
 #
