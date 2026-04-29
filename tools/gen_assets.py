@@ -655,6 +655,194 @@ TOWER3_L2_BG_B = design_tile([
     ",oo##oo,",
 ])
 
+# Iter-4 #28: Title screen art tiles (17 tiles).
+TITLE_B_TL = design_tile([
+    "........",
+    ".#######",
+    ".#######",
+    ".###....",
+    ".###....",
+    ".#######",
+    ".#######",
+    ".###....",
+])
+
+TITLE_B_TR = design_tile([
+    "........",
+    "####....",
+    "#####...",
+    "..###...",
+    "..###...",
+    "####....",
+    "#####...",
+    "..###...",
+])
+
+TITLE_B_BL = design_tile([
+    ".###....",
+    ".###....",
+    ".#######",
+    ".#######",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_B_BR = design_tile([
+    "..###...",
+    "..###...",
+    "#####...",
+    "####....",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_U_T = design_tile([
+    "........",
+    ".###....",
+    ".###....",
+    ".###....",
+    ".###....",
+    ".###....",
+    ".###....",
+    ".###....",
+])
+
+TITLE_U_BL = design_tile([
+    ".###....",
+    ".####...",
+    "..######",
+    "...#####",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_U_BR = design_tile([
+    ".###....",
+    "####....",
+    "###.....",
+    "##......",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_G_TL = design_tile([
+    "........",
+    "....####",
+    "...#####",
+    "..###...",
+    ".###....",
+    ".###....",
+    ".###....",
+    ".###....",
+])
+
+TITLE_G_TR = design_tile([
+    "........",
+    "###.....",
+    "####....",
+    "..###...",
+    "........",
+    "........",
+    "####....",
+    "####....",
+])
+
+TITLE_G_BL = design_tile([
+    ".###....",
+    "..###...",
+    "...#####",
+    "....####",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_G_BR = design_tile([
+    "..###...",
+    "..###...",
+    "####....",
+    "###.....",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_HLINE = design_tile([
+    "........",
+    "........",
+    "........",
+    "oooooooo",
+    "oooooooo",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_NODE = design_tile([
+    "........",
+    "...oo...",
+    "..oooo..",
+    "oooooooo",
+    "oooooooo",
+    "..oooo..",
+    "...oo...",
+    "........",
+])
+
+TITLE_BUG_T = design_tile([
+    "..#..#..",
+    "...##...",
+    "..####..",
+    ".##..##.",
+    "########",
+    ".##..##.",
+    "#.####.#",
+    ".######.",
+])
+
+TITLE_BUG_B = design_tile([
+    ".#.##.#.",
+    "########",
+    ".##..##.",
+    "..####..",
+    "...##...",
+    "........",
+    "........",
+    "........",
+])
+
+TITLE_TW_T = design_tile([
+    "...##...",
+    "..####..",
+    ".######.",
+    ".#.##.#.",
+    "...##...",
+    "..####..",
+    ".#....#.",
+    ".######.",
+])
+
+TITLE_TW_B = design_tile([
+    ".######.",
+    ".##..##.",
+    "..####..",
+    "..####..",
+    ".######.",
+    ".######.",
+    "........",
+    "........",
+])
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -695,6 +883,24 @@ map_tiles = [
     ('TILE_TOWER_2_L2_B',  TOWER2_L2_BG_B),
     ('TILE_TOWER_3_L2',    TOWER3_L2_BG),
     ('TILE_TOWER_3_L2_B',  TOWER3_L2_BG_B),
+    # Iter-4 #28: Title screen art tiles.
+    ('TILE_TITLE_B_TL',  TITLE_B_TL),
+    ('TILE_TITLE_B_TR',  TITLE_B_TR),
+    ('TILE_TITLE_B_BL',  TITLE_B_BL),
+    ('TILE_TITLE_B_BR',  TITLE_B_BR),
+    ('TILE_TITLE_U_T',   TITLE_U_T),
+    ('TILE_TITLE_U_BL',  TITLE_U_BL),
+    ('TILE_TITLE_U_BR',  TITLE_U_BR),
+    ('TILE_TITLE_G_TL',  TITLE_G_TL),
+    ('TILE_TITLE_G_TR',  TITLE_G_TR),
+    ('TILE_TITLE_G_BL',  TITLE_G_BL),
+    ('TILE_TITLE_G_BR',  TITLE_G_BR),
+    ('TILE_TITLE_HLINE', TITLE_HLINE),
+    ('TILE_TITLE_NODE',  TITLE_NODE),
+    ('TILE_TITLE_BUG_T', TITLE_BUG_T),
+    ('TILE_TITLE_BUG_B', TITLE_BUG_B),
+    ('TILE_TITLE_TW_T',  TITLE_TW_T),
+    ('TILE_TITLE_TW_B',  TITLE_TW_B),
 ]
 
 # ----------------------------------------------------------------------------
@@ -1028,11 +1234,54 @@ TILE_COMP_TR_D_IDX = MAP_TILE_BASE + 7
 TILE_COMP_BL_D_IDX = MAP_TILE_BASE + 8
 TILE_COMP_BR_D_IDX = MAP_TILE_BASE + 9
 
+# Iter-4 #28: Title art tile index constants.
+TITLE_B_TL_IDX  = MAP_TILE_BASE + 35
+TITLE_B_TR_IDX  = MAP_TILE_BASE + 36
+TITLE_B_BL_IDX  = MAP_TILE_BASE + 37
+TITLE_B_BR_IDX  = MAP_TILE_BASE + 38
+TITLE_U_T_IDX   = MAP_TILE_BASE + 39
+TITLE_U_BL_IDX  = MAP_TILE_BASE + 40
+TITLE_U_BR_IDX  = MAP_TILE_BASE + 41
+TITLE_G_TL_IDX  = MAP_TILE_BASE + 42
+TITLE_G_TR_IDX  = MAP_TILE_BASE + 43
+TITLE_G_BL_IDX  = MAP_TILE_BASE + 44
+TITLE_G_BR_IDX  = MAP_TILE_BASE + 45
+TITLE_HLINE_IDX = MAP_TILE_BASE + 46
+TITLE_NODE_IDX  = MAP_TILE_BASE + 47
+TITLE_BUG_T_IDX = MAP_TILE_BASE + 48
+TITLE_BUG_B_IDX = MAP_TILE_BASE + 49
+TITLE_TW_T_IDX  = MAP_TILE_BASE + 50
+TITLE_TW_B_IDX  = MAP_TILE_BASE + 51
+
 def title_map():
+    S = 32
+    # Use Python index constants (must match append order in map_tiles).
+    B_TL = TITLE_B_TL_IDX;  B_TR = TITLE_B_TR_IDX
+    B_BL = TITLE_B_BL_IDX;  B_BR = TITLE_B_BR_IDX
+    U_T  = TITLE_U_T_IDX
+    U_BL = TITLE_U_BL_IDX;  U_BR = TITLE_U_BR_IDX
+    G_TL = TITLE_G_TL_IDX;  G_TR = TITLE_G_TR_IDX
+    G_BL = TITLE_G_BL_IDX;  G_BR = TITLE_G_BR_IDX
+    HL   = TITLE_HLINE_IDX
+    ND   = TITLE_NODE_IDX
+    BG_T = TITLE_BUG_T_IDX
+    BG_B = TITLE_BUG_B_IDX
+    TW_T = TITLE_TW_T_IDX
+    TW_B = TITLE_TW_B_IDX
+    CT = TILE_COMP_TL_IDX       # 130 — existing computer tiles
+    CR = TILE_COMP_TR_IDX       # 131
+    CB = TILE_COMP_BL_IDX       # 132
+    CX = TILE_COMP_BR_IDX       # 133
+
     rows = [blank_row() for _ in range(18)]
-    rows[2]  = text_row("    BUG DEFENDER    ")
-    rows[6]  = text_row(" A RUNAWAY AI IS    ")
-    rows[7]  = text_row(" SENDING THE BUGS   ")
+    # --- Art area (rows 0-9) ---
+    rows[1]  = [S,S,S,S,S,S, B_TL,B_TR, S, U_T,U_T, S, G_TL,G_TR, S,S,S,S,S,S]
+    rows[2]  = [S,S,S,S,S,S, B_BL,B_BR, S, U_BL,U_BR, S, G_BL,G_BR, S,S,S,S,S,S]
+    rows[3]  = text_row("      DEFENDER      ")
+    rows[4]  = [S,S, ND, HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL, ND, S,S]
+    rows[6]  = [S,S,S,S, BG_T, HL,HL,HL, S, CT,CR, S, HL,HL,HL, TW_T, S,S,S,S]
+    rows[7]  = [S,S,S,S, BG_B, S,S,S,    S, CB,CX, S, S,S,S,    TW_B, S,S,S,S]
+    # --- UI area (rows 10-17, selectors overwritten at runtime) ---
     rows[13] = text_row("    PRESS START     ")
     rows[16] = text_row("    (C) 2025 GBTD   ")
     return rows
@@ -1256,7 +1505,24 @@ assets_h = """\
 #define TILE_TOWER_2_L2_B (MAP_TILE_BASE + 32)
 #define TILE_TOWER_3_L2   (MAP_TILE_BASE + 33)
 #define TILE_TOWER_3_L2_B (MAP_TILE_BASE + 34)
-#define MAP_TILE_COUNT  35
+#define TILE_TITLE_B_TL   (MAP_TILE_BASE + 35)
+#define TILE_TITLE_B_TR   (MAP_TILE_BASE + 36)
+#define TILE_TITLE_B_BL   (MAP_TILE_BASE + 37)
+#define TILE_TITLE_B_BR   (MAP_TILE_BASE + 38)
+#define TILE_TITLE_U_T    (MAP_TILE_BASE + 39)
+#define TILE_TITLE_U_BL   (MAP_TILE_BASE + 40)
+#define TILE_TITLE_U_BR   (MAP_TILE_BASE + 41)
+#define TILE_TITLE_G_TL   (MAP_TILE_BASE + 42)
+#define TILE_TITLE_G_TR   (MAP_TILE_BASE + 43)
+#define TILE_TITLE_G_BL   (MAP_TILE_BASE + 44)
+#define TILE_TITLE_G_BR   (MAP_TILE_BASE + 45)
+#define TILE_TITLE_HLINE  (MAP_TILE_BASE + 46)
+#define TILE_TITLE_NODE   (MAP_TILE_BASE + 47)
+#define TILE_TITLE_BUG_T  (MAP_TILE_BASE + 48)
+#define TILE_TITLE_BUG_B  (MAP_TILE_BASE + 49)
+#define TILE_TITLE_TW_T   (MAP_TILE_BASE + 50)
+#define TILE_TITLE_TW_B   (MAP_TILE_BASE + 51)
+#define MAP_TILE_COUNT  52
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1
