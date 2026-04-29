@@ -855,6 +855,73 @@ TILE_ARROW_ART = design_tile([
     "........",
 ])
 
+# Iter-6: End-screen art tiles.
+ENDSCR_STATIC = design_tile([
+    "o#,o##.#",
+    "#oo#.o#o",
+    ".#o#o##,",
+    "o#,##o.#",
+    "##o.#o#o",
+    "#.o#o#,#",
+    "o##,o#o.",
+    "#o#.#oo#",
+])
+
+ENDSCR_BROKEN_HL = design_tile([
+    "........",
+    ".....o..",
+    "........",
+    "oo..oo.o",
+    "o.oo..oo",
+    "........",
+    "..o.....",
+    "........",
+])
+
+ENDSCR_SKULL_T = design_tile([
+    "..####..",
+    ".######.",
+    "##.##.##",
+    "########",
+    "########",
+    ".##..##.",
+    "..####..",
+    ".##..##.",
+])
+
+ENDSCR_SKULL_B = design_tile([
+    "..####..",
+    "...##...",
+    "...##...",
+    "........",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
+ENDSCR_SHIELD_T = design_tile([
+    ".######.",
+    "########",
+    "########",
+    "########",
+    "########",
+    "########",
+    ".######.",
+    "..####..",
+])
+
+ENDSCR_SHIELD_B = design_tile([
+    "...##...",
+    "...##...",
+    "...##...",
+    "........",
+    "........",
+    "........",
+    "........",
+    "........",
+])
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -915,6 +982,13 @@ map_tiles = [
     ('TILE_TITLE_TW_B',  TITLE_TW_B),
     # Iter-5: Arrow tile for title selector focus.
     ('TILE_ARROW',       TILE_ARROW_ART),
+    # Iter-6: End-screen art tiles.
+    ('TILE_ENDSCR_STATIC',    ENDSCR_STATIC),
+    ('TILE_ENDSCR_BROKEN_HL', ENDSCR_BROKEN_HL),
+    ('TILE_ENDSCR_SKULL_T',   ENDSCR_SKULL_T),
+    ('TILE_ENDSCR_SKULL_B',   ENDSCR_SKULL_B),
+    ('TILE_ENDSCR_SHIELD_T',  ENDSCR_SHIELD_T),
+    ('TILE_ENDSCR_SHIELD_B',  ENDSCR_SHIELD_B),
 ]
 
 # ----------------------------------------------------------------------------
@@ -1268,6 +1342,14 @@ TITLE_TW_T_IDX  = MAP_TILE_BASE + 50
 TITLE_TW_B_IDX  = MAP_TILE_BASE + 51
 TILE_ARROW_IDX  = MAP_TILE_BASE + 52
 
+# Iter-6: End-screen art tile index constants.
+ENDSCR_STATIC_IDX    = MAP_TILE_BASE + 53
+ENDSCR_BROKEN_HL_IDX = MAP_TILE_BASE + 54
+ENDSCR_SKULL_T_IDX   = MAP_TILE_BASE + 55
+ENDSCR_SKULL_B_IDX   = MAP_TILE_BASE + 56
+ENDSCR_SHIELD_T_IDX  = MAP_TILE_BASE + 57
+ENDSCR_SHIELD_B_IDX  = MAP_TILE_BASE + 58
+
 def title_map():
     S = 32
     # Use Python index constants (must match append order in map_tiles).
@@ -1301,23 +1383,54 @@ def title_map():
     return rows
 
 def win_map():
+    S = 32
+    HL   = TITLE_HLINE_IDX
+    ND   = TITLE_NODE_IDX
+    TT   = TITLE_TW_T_IDX
+    TB   = TITLE_TW_B_IDX
+    CT   = TILE_COMP_TL_IDX
+    CR   = TILE_COMP_TR_IDX
+    CB   = TILE_COMP_BL_IDX
+    CX   = TILE_COMP_BR_IDX
+    SH   = ENDSCR_SHIELD_T_IDX
+    SS   = ENDSCR_SHIELD_B_IDX
+
     rows = [blank_row() for _ in range(18)]
-    rows[2]  = text_row("    SYSTEM CLEAN    ")
-    rows[5]  = text_row(" ALL PROCESSES      ")
-    rows[6]  = text_row(" TERMINATED  AND    ")
-    rows[7]  = text_row(" SO IS YOUR BATTERY ")
-    rows[11] = text_row("       :  )         ")
-    rows[15] = text_row("    PRESS START     ")
+    rows[1]  = text_row("      VICTORY!      ")
+    rows[3]  = [S,S, ND, HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL, ND, S,S]
+    rows[5]  = [S,S,S,S, TT, HL,HL,HL, S, CT,CR, S, HL,HL,HL, TT, S,S,S,S]
+    rows[6]  = [S,S,S,S, TB, S,S,S,    S, CB,CX, S, S,S,S,    TB, S,S,S,S]
+    rows[8]  = [S,S, ND, HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL, ND, S,S]
+    rows[10] = [S,S,S,S,S,S, TT, S,S, SH, S,S, TT, S,S,S,S,S,S,S]
+    rows[11] = [S,S,S,S,S,S, TB, S,S, SS, S,S, TB, S,S,S,S,S,S,S]
     return rows
 
 def lose_map():
+    S = 32
+    HL   = TITLE_HLINE_IDX
+    ND   = TITLE_NODE_IDX
+    BK   = ENDSCR_BROKEN_HL_IDX
+    BT   = TITLE_BUG_T_IDX
+    BB   = TITLE_BUG_B_IDX
+    DT   = TILE_COMP_TL_D_IDX
+    DR   = TILE_COMP_TR_D_IDX
+    DB   = TILE_COMP_BL_D_IDX
+    DX   = TILE_COMP_BR_D_IDX
+    ST   = ENDSCR_STATIC_IDX
+    SK   = ENDSCR_SKULL_T_IDX
+    SB   = ENDSCR_SKULL_B_IDX
+
     rows = [blank_row() for _ in range(18)]
-    rows[2]  = text_row("    KERNEL PANIC    ")
-    rows[5]  = text_row(" THE AI WON         ")
-    rows[6]  = text_row(" PLEASE REBOOT      ")
-    rows[7]  = text_row(" YOUR CIVILIZATION  ")
-    rows[11] = text_row("       X_X          ")
-    rows[15] = text_row("    PRESS START     ")
+    rows[0]  = [ST]*20
+    rows[1]  = text_row("     GAME OVER      ")
+    rows[2]  = [ST]*20
+    rows[4]  = [S,S, ND, BK,BK,BK,BK,BK,BK,BK,BK,BK,BK,BK,BK,BK,BK, ND, S,S]
+    rows[6]  = [S,S,S,S, BT, BK,BK,BK, S, DT,DR, S, BK,BK,BK, BT, S,S,S,S]
+    rows[7]  = [S,S,S,S, BB, S,S,S,    S, DB,DX, S, S,S,S,    BB, S,S,S,S]
+    rows[9]  = [S,S, ND, HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL,HL, ND, S,S]
+    rows[10] = [S,S,S,S,S,S, BT, S,S, SK, S,S, BT, S,S,S,S,S,S,S]
+    rows[11] = [S,S,S,S,S,S, BB, S,S, SB, S,S, BB, S,S,S,S,S,S,S]
+    rows[17] = [ST]*20
     return rows
 
 # ----------------------------------------------------------------------------
@@ -1537,7 +1650,13 @@ assets_h = """\
 #define TILE_TITLE_TW_T   (MAP_TILE_BASE + 50)
 #define TILE_TITLE_TW_B   (MAP_TILE_BASE + 51)
 #define TILE_ARROW        (MAP_TILE_BASE + 52)
-#define MAP_TILE_COUNT  53
+#define TILE_ENDSCR_STATIC    (MAP_TILE_BASE + 53)
+#define TILE_ENDSCR_BROKEN_HL (MAP_TILE_BASE + 54)
+#define TILE_ENDSCR_SKULL_T   (MAP_TILE_BASE + 55)
+#define TILE_ENDSCR_SKULL_B   (MAP_TILE_BASE + 56)
+#define TILE_ENDSCR_SHIELD_T  (MAP_TILE_BASE + 57)
+#define TILE_ENDSCR_SHIELD_B  (MAP_TILE_BASE + 58)
+#define MAP_TILE_COUNT  59
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1

@@ -218,3 +218,11 @@ Direct enemy_t access from outside enemies.c is forbidden.
 - **Render order (updated)**: `hud_update → map_render → gate_render → menu_render → towers_render → pause_render`. Menu before towers so `towers_render()` Phase 3 idle-blink correction is the last writer for adjacent tower tiles in the restore region.
 - **BG-write budget with menu BG**: sell-close worst case = 3 (HUD E) + 12 (restore) + 1 (sell-clear) = 16 (exactly at cap). All other paths ≤ 15.
 - **Static buffer**: `static u8 s_menu_bg_buf[12]` in `menu.c`. `menu_init()` zeroes all BG state (col, row, buffer, pending flags).
+
+### End-screen art composition pattern (iter-6)
+- **Scene mirroring**: End screens reuse the title screen's row 6–7 composition (icon + traces + computer + traces + icon) with character substitutions to tell the outcome story. Lose = bugs on both sides + damaged computer. Win = towers on both sides + healthy computer. This provides visual continuity across screens.
+- **Motif row pattern**: A centered 7-tile-wide group at rows 10–11 (icon + 2 blanks + motif + 2 blanks + icon) placed at `floor((20-7)/2)=6`. The "motif" is the screen's unique 1×2 icon (skull for lose, shield for win).
+- **Heading text on end screens**: Standard font at row 1, NOT block-letter art tiles. Block letters cost 4+ tiles per character (infeasible for multi-word headings within tile budget). Visual impact comes from the surrounding art composition, not the text size.
+- **Mood via fill tiles**: Dark/light mood is achieved by filling decorative rows with dark-toned tiles (STATIC on lose) vs leaving them as white space (win). This preserves font legibility on all rows that contain text.
+- **Reserved score rows**: gameover.c code-draws at rows 13–15. Both end-screen tilemaps MUST have all-space (tile 32) at those entire rows. Art composition lives above row 12 with row 12 blank as breathing room.
+- **Tile naming for end-screen art**: `ENDSCR_*` prefix distinguishes from `TITLE_*` tiles. Python idx constants follow the `*_IDX = MAP_TILE_BASE + N` pattern.
