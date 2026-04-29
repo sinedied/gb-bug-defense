@@ -25,8 +25,31 @@ static bool s_open;
 static u8   s_tower_idx;
 static u8   s_sel;        /* 0 = UPG, 1 = SEL */
 
+/* Iter-4 #25: BG save/restore state for menu background rectangle. */
+static u8 s_bg_col;              /* screen tile column of BG rect left edge */
+static u8 s_bg_row;              /* screen tile row of BG rect top edge */
+static u8 s_menu_bg_buf[12];     /* saved BG tiles (6 cols × 2 rows, row-major) */
+static u8 s_bg_save_pending;     /* 1 = save + clear on next render */
+static u8 s_bg_restore_pending;  /* 1 = restore on next render */
+
 /* Cell offsets within the 14-slot OAM range. */
 #define CELL(row, col)  ((row) * 7 + (col))
+
+/* Compute the pixel anchor (mx, my) for the menu overlay from s_tower_idx.
+ * Used by both menu_open (for BG rect position) and menu_render (for sprites). */
+static void compute_anchor(u8 *out_mx, u8 *out_my) {
+    u8 tx_px = towers_tile_screen_x(s_tower_idx);
+    u8 ty_px = towers_tile_screen_y(s_tower_idx);
+
+    i16 mx_raw = (i16)tx_px - 24;
+    if (mx_raw < 0) mx_raw = 0;
+    if (mx_raw > 160 - 56) mx_raw = 160 - 56;
+    *out_mx = (u8)mx_raw;
+
+    u8 pf_row = (ty_px / 8) - HUD_ROWS;
+    if (pf_row <= 1) *out_my = ty_px + 16;   /* below */
+    else             *out_my = ty_px - 16;   /* above */
+}
 
 bool menu_is_open(void) { return s_open; }
 
@@ -41,26 +64,37 @@ void menu_init(void) {
     s_open = false;
     s_tower_idx = 0;
     s_sel = 0;
+    /* Iter-4 #25: clear BG save/restore state. */
+    s_bg_col = 0;
+    s_bg_row = 0;
+    s_bg_save_pending = 0;
+    s_bg_restore_pending = 0;
+    {
+        u8 i;
+        for (i = 0; i < 12; i++) s_menu_bg_buf[i] = 0;
+    }
     hide_menu_oam();
 }
 
 void menu_open(u8 idx) {
+    u8 mx, my;
     s_open = true;
     s_tower_idx = idx;
     s_sel = 0;
+    /* Iter-4 #25: compute BG rect position and arm save+clear. */
+    compute_anchor(&mx, &my);
+    s_bg_col = (mx / 8) + 1;   /* skip cursor column */
+    s_bg_row = my / 8;
+    s_bg_save_pending = 1;
     enemies_hide_all();
     projectiles_hide_all();
     cursor_blink_pause(true);
-    /* cursor_update() is gated off while the menu is open, so the paused-
-     * blink phase set above never reaches OAM. Force the steady on-phase
-     * tile here so the cursor stays visible for the entire menu session
-     * (otherwise it freezes at whatever blink phase it had on this frame
-     * — half the time the transparent SPR_CURSOR_GB tile -> invisible). */
     set_sprite_tile(OAM_CURSOR, SPR_CURSOR_A);
 }
 
 void menu_close(void) {
     s_open = false;
+    s_bg_restore_pending = 1;   /* iter-4 #25: arm BG restore */
     hide_menu_oam();
     cursor_blink_pause(false);
 }
@@ -122,25 +156,35 @@ static void hide_cell(u8 cell) {
 }
 
 void menu_render(void) {
+    u8 mx, my;
+
+    /* Iter-4 #25: deferred BG save+clear (fires once after menu_open). */
+    if (s_bg_save_pending) {
+        u8 r, c;
+        for (r = 0; r < 2; r++) {
+            for (c = 0; c < 6; c++) {
+                s_menu_bg_buf[r * 6 + c] = get_bkg_tile_xy(s_bg_col + c, s_bg_row + r);
+                set_bkg_tile_xy(s_bg_col + c, s_bg_row + r, (u8)' ');
+            }
+        }
+        s_bg_save_pending = 0;
+    }
+
+    /* Iter-4 #25: deferred BG restore (fires once after menu_close). */
+    if (s_bg_restore_pending) {
+        u8 r, c;
+        for (r = 0; r < 2; r++) {
+            for (c = 0; c < 6; c++) {
+                set_bkg_tile_xy(s_bg_col + c, s_bg_row + r, s_menu_bg_buf[r * 6 + c]);
+            }
+        }
+        s_bg_restore_pending = 0;
+        return;   /* menu is closed — no sprite rendering */
+    }
+
     if (!s_open) return;
 
-    /* Anchor: 56-px-wide widget centered on tower, clamped to screen.
-     * Vertical: pf_row >= 2 -> float above tower; else float below. */
-    u8 tx_px = towers_tile_screen_x(s_tower_idx);   /* tile top-left X */
-    u8 ty_px = towers_tile_screen_y(s_tower_idx);   /* tile top-left Y */
-
-    /* Centered: tx_px + 4 - 28 = tx_px - 24 */
-    i16 mx_raw = (i16)tx_px - 24;
-    if (mx_raw < 0) mx_raw = 0;
-    if (mx_raw > 160 - 56) mx_raw = 160 - 56;
-    u8 mx = (u8)mx_raw;
-
-    /* The tower's play-field row drives vertical placement. The on-screen
-     * tile-row equals (ty_px / 8); subtract HUD_ROWS to get pf-row. */
-    u8 pf_row = (ty_px / 8) - HUD_ROWS;
-    u8 my;
-    if (pf_row <= 1) my = ty_px + 16;   /* below */
-    else             my = ty_px - 16;   /* above */
+    compute_anchor(&mx, &my);
 
     /* Row 0: > U P G : Nh Nl   (cursor only when s_sel == 0) */
     /* Row 1:   S E L : Nh Nl   (cursor only when s_sel == 1) */

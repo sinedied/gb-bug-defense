@@ -211,3 +211,10 @@ Direct enemy_t access from outside enemies.c is forbidden.
 - **BG-write budget with gate**: gate-lift frame = 3 (HUD E) + 12 (restore) + 1 (tower) = 16 (exactly at cap). B-button is gated on `!s_gate_active` to prevent A+B same-frame overflow to 17.
 - **`map_tile_at(u8 tx, u8 ty)`**: new accessor in `map.h`/`map.c` reading original tilemap tiles for play-field-local positions. Returns `TILE_GROUND` for out-of-bounds. Follows `map_class_at()` pattern.
 - **Pure-helper headers (extended)**: `src/gate_calc.h` joins the `<stdint.h>`-only family (`tuning.h`, `game_modal.h`, `*_anim.h`, `difficulty_calc.h`, `score_calc.h`, `save_calc.h`). Test coverage in `tests/test_gate.c`.
+
+### Iter-4 #25 conventions (menu BG background)
+- **Menu BG rectangle**: 6 cols × 2 rows = 12 tiles behind sprite columns 1–6 (text area). Column 0 (cursor `>`) is excluded. Blank tile = `(u8)' '` (0x20, shade-0 white).
+- **Deferred BG phases in `menu_render()`**: Save+clear and restore are driven by `s_bg_save_pending` / `s_bg_restore_pending` flags set in `menu_open()` / `menu_close()`. All VRAM reads (`get_bkg_tile_xy()`) and writes (`set_bkg_tile_xy()`) happen inside `menu_render()` (VBlank-safe). The restore phase runs before the `if (!s_open) return;` guard so it fires on the close frame.
+- **Render order (updated)**: `hud_update → map_render → gate_render → menu_render → towers_render → pause_render`. Menu before towers so `towers_render()` Phase 3 idle-blink correction is the last writer for adjacent tower tiles in the restore region.
+- **BG-write budget with menu BG**: sell-close worst case = 3 (HUD E) + 12 (restore) + 1 (sell-clear) = 16 (exactly at cap). All other paths ≤ 15.
+- **Static buffer**: `static u8 s_menu_bg_buf[12]` in `menu.c`. `menu_init()` zeroes all BG state (col, row, buffer, pending flags).

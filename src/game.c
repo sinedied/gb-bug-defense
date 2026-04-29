@@ -302,8 +302,8 @@ static void playing_render(void) {
     hud_update();
     map_render();
     gate_render();      /* iter-4 #24: before towers so tower tile wins on overlap */
+    menu_render();      /* iter-4 #25: BG save/restore + sprite OAM */
     towers_render();
-    menu_render();    /* sprite OAM only — no BG writes */
     pause_render();   /* sprite OAM only — no BG writes */
 }
 
