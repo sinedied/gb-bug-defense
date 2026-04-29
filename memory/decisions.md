@@ -595,3 +595,24 @@
 - **Rationale**: Save-compat is non-negotiable for real hardware users.
   Namespace prefix rename would touch 27+ files for zero user value.
 - **Alternatives**: None — these are constraint clarifications, not design choices.
+
+### Iter-4 #24: Gate state lives in game.c, not a new module
+- **Date**: 2026-06-08
+- **Context**: Feature #24 first-tower gate needs state tracking, BG text overlay, and integration with the playing_update flow.
+- **Decision**: Gate state (`s_gate_active`, `s_gate_blink`, `s_gate_vis`, `s_gate_dirty`) lives in `game.c`. Blink-phase computation is extracted to a pure helper `src/gate_calc.h` for host testing.
+- **Rationale**: The gate is a transient start condition, not a subsystem. `game.c` already owns `playing_update()` flow control and the `waves_update()` call site. A new `.c` module adds include complexity with no benefit. Pure helper keeps blink logic testable on the host.
+- **Alternatives**: New `gate.c` module (rejected — over-engineering for ~30 lines of state); inside `waves.c` (rejected — waves.c has no BG-write capability); all inline in game.c without pure helper (rejected — untestable blink logic).
+
+### Iter-4 #24: Skip waves_update(), no changes to waves.c
+- **Date**: 2026-06-08
+- **Context**: Gate must freeze wave progression until first tower placement. `waves_init()` sets `s_timer = FIRST_GRACE`.
+- **Decision**: `playing_update()` simply skips calling `waves_update()` while `s_gate_active == 1`. When the gate lifts, calls resume and the timer counts down from FIRST_GRACE naturally.
+- **Rationale**: Zero changes to waves.c. The timer freeze is an emergent property of not calling the update function. Simplest possible approach — no new API, no new state in waves.c.
+- **Alternatives**: `waves_pause()`/`waves_resume()` API (rejected — new public API for a single call site); reset timer via `waves_arm_grace()` (rejected — redundant; timer is already at FIRST_GRACE from waves_init).
+
+### Iter-4 #24: B-button gated during gate to avoid BG-write budget overflow
+- **Date**: 2026-06-08
+- **Context**: If A+B are pressed simultaneously on the gate-lift frame, `cycle_tower_type()` marks HUD T dirty (1 BG write) and `towers_try_place()` marks HUD E dirty (3 writes). Combined with gate restore (12) and tower render (1) = 17 writes, exceeding the 16-write budget.
+- **Decision**: Gate the `J_B` handler in `playing_update()` on `!s_gate_active`. Tower type cycling is blocked until the gate lifts.
+- **Rationale**: During the gate, no tower exists and no tower has been placed, so cycling the type indicator has minimal value. The guard is a single `if` condition that prevents a real 17-write budget overflow on DMG hardware.
+- **Alternatives**: Accept the 17-write possibility (rejected — convention violation on real hardware causes tile corruption); defer gate restore to next frame (rejected — one-frame stale text after placement is a UX regression).

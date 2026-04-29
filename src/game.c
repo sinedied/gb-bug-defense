@@ -19,6 +19,7 @@
 #include "score.h"
 #include "game_modal.h"
 #include "tower_select.h"
+#include "gate_calc.h"
 #include <gb/gb.h>
 
 enum { GS_TITLE, GS_PLAYING, GS_WIN, GS_LOSE };
@@ -34,6 +35,17 @@ static u8 s_difficulty = DIFF_NORMAL;
  * as s_difficulty — survives enter_title/enter_playing within one
  * power-on session, resets to MAP_1 on cold-boot via .data zero-init. */
 static u8 s_active_map = 0;
+
+/* Iter-4 #24: first-tower gate state */
+static u8 s_gate_active;   /* 1 while waiting for first tower placement */
+static u8 s_gate_blink;    /* frame counter for blink timing (wrapping u8) */
+static u8 s_gate_vis;      /* last-painted blink phase: 1=text, 0=map tiles */
+static u8 s_gate_dirty;    /* 1 = need BG restore on gate-lift frame */
+
+#define GATE_COL    7
+#define GATE_ROW1   8   /* screen row = PF row 7 + HUD_ROWS */
+#define GATE_ROW2   9   /* screen row = PF row 8 + HUD_ROWS */
+#define GATE_W      6
 
 u8 game_get_selected_tower_type(void) { return s_selected_type; }
 
@@ -53,6 +65,53 @@ bool game_is_modal_open(void) {
     /* Single source of truth — keep aligned with playing_update's
      * modal-precedence branch order. */
     return menu_is_open() || pause_is_open();
+}
+
+/* Iter-4 #24: gate BG helpers ---------------------------------------- */
+static void gate_paint_text(void) {
+    /* "PLACEA" at (GATE_COL, GATE_ROW1) */
+    set_bkg_tile_xy(GATE_COL + 0, GATE_ROW1, (u8)'P');
+    set_bkg_tile_xy(GATE_COL + 1, GATE_ROW1, (u8)'L');
+    set_bkg_tile_xy(GATE_COL + 2, GATE_ROW1, (u8)'A');
+    set_bkg_tile_xy(GATE_COL + 3, GATE_ROW1, (u8)'C');
+    set_bkg_tile_xy(GATE_COL + 4, GATE_ROW1, (u8)'E');
+    set_bkg_tile_xy(GATE_COL + 5, GATE_ROW1, (u8)'A');
+    /* "TOWER!" at (GATE_COL, GATE_ROW2) */
+    set_bkg_tile_xy(GATE_COL + 0, GATE_ROW2, (u8)'T');
+    set_bkg_tile_xy(GATE_COL + 1, GATE_ROW2, (u8)'O');
+    set_bkg_tile_xy(GATE_COL + 2, GATE_ROW2, (u8)'W');
+    set_bkg_tile_xy(GATE_COL + 3, GATE_ROW2, (u8)'E');
+    set_bkg_tile_xy(GATE_COL + 4, GATE_ROW2, (u8)'R');
+    set_bkg_tile_xy(GATE_COL + 5, GATE_ROW2, (u8)'!');
+}
+
+static void gate_restore_tiles(void) {
+    u8 c;
+    for (c = 0; c < GATE_W; c++) {
+        set_bkg_tile_xy(GATE_COL + c, GATE_ROW1,
+                        map_tile_at(GATE_COL + c, GATE_ROW1 - HUD_ROWS));
+        set_bkg_tile_xy(GATE_COL + c, GATE_ROW2,
+                        map_tile_at(GATE_COL + c, GATE_ROW2 - HUD_ROWS));
+    }
+}
+
+static void gate_render(void) {
+    u8 want;
+    if (s_gate_dirty) {
+        gate_restore_tiles();
+        s_gate_dirty = 0;
+        return;
+    }
+    if (!s_gate_active) return;
+    if (game_is_modal_open()) return;
+    want = gate_blink_visible(s_gate_blink);
+    if (want == s_gate_vis) return;
+    s_gate_vis = want;
+    if (want) {
+        gate_paint_text();
+    } else {
+        gate_restore_tiles();
+    }
 }
 
 static void enter_title(void) {
@@ -87,6 +146,12 @@ static void enter_playing(void) {
     menu_init();
     pause_init();
     hud_init();
+    /* Iter-4 #24: first-tower gate — paint text while display is off. */
+    s_gate_active = 1;
+    s_gate_blink  = 0;
+    s_gate_vis    = 1;
+    s_gate_dirty  = 0;
+    gate_paint_text();
     /* Clear any stale audio state from the previous session — otherwise the
      * win/lose jingle on ch1 (priority 3) leaks across sessions and blocks
      * every subsequent ch1 SFX (e.g. tower-place) for the rest of the run. */
@@ -162,7 +227,7 @@ static void playing_update(void) {
         menu_update();
     } else {
         cursor_update();
-        if (input_is_pressed(J_B)) {
+        if (!s_gate_active && input_is_pressed(J_B)) {
             cycle_tower_type();
         }
         if (input_is_pressed(J_A)) {
@@ -177,12 +242,22 @@ static void playing_update(void) {
                 audio_tick();
                 return;
             }
-            towers_try_place(cursor_tx(), cursor_ty(), s_selected_type);
+            if (towers_try_place(cursor_tx(), cursor_ty(), s_selected_type)) {
+                if (s_gate_active) {
+                    s_gate_active = 0;
+                    s_gate_dirty  = 1;
+                }
+            }
         }
         towers_update();
         enemies_update();
         projectiles_update();
-        waves_update();
+        if (s_gate_active) {
+            s_gate_blink++;
+            if (s_gate_blink >= 60) s_gate_blink = 0;
+        } else {
+            waves_update();
+        }
         /* Iter-3 #19: drain wave-clear edge into score. One-shot per
          * cleared wave; runs only on the normal entity-update path so
          * pause/menu modes can't fire it. */
@@ -191,7 +266,7 @@ static void playing_update(void) {
             if (cleared) score_add_wave_clear(cleared);
         }
     }
-    economy_tick();   /* runs even with menu open — D19 */
+    if (!s_gate_active) economy_tick();   /* runs even with menu open — D19 */
     audio_tick();     /* runs always so SFX continue during menu */
 
     /* Gameover wins over pause: same-frame HP→0 or last-enemy-killed
@@ -226,6 +301,7 @@ static void playing_render(void) {
      * placed tower tiles) must land in the VBlank window. */
     hud_update();
     map_render();
+    gate_render();      /* iter-4 #24: before towers so tower tile wins on overlap */
     towers_render();
     menu_render();    /* sprite OAM only — no BG writes */
     pause_render();   /* sprite OAM only — no BG writes */

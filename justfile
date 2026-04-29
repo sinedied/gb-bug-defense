@@ -173,6 +173,11 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
        tests/test_score.c src/score.c -o "{{BUILD}}/test_score"
     "{{BUILD}}/test_score"
+    # test_gate (iter-4 #24) exercises the pure blink-phase helper in
+    # src/gate_calc.h (header-only, <stdint.h> only — no GBDK linkage).
+    cc -std=c99 -Wall -Wextra -O2 -Isrc \
+       tests/test_gate.c -o "{{BUILD}}/test_gate"
+    "{{BUILD}}/test_gate"
 
 # Build + launch emulator (one-command playtest)
 #

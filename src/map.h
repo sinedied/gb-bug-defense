@@ -30,6 +30,7 @@ typedef struct {
 void              map_load(u8 id);
 void              map_render(void);          /* VBlank-safe deferred redraws */
 u8                map_class_at(u8 tx, u8 ty);
+u8                map_tile_at(u8 tx, u8 ty);  /* iter-4 #24: read original tilemap tile */
 const waypoint_t *map_waypoints(void);
 u8                map_waypoint_count(void);
 u8                map_active(void);

@@ -57,6 +57,11 @@ u8 map_class_at(u8 tx, u8 ty) {
     return s_maps[s_active_map_id].classmap[ty * PF_COLS + tx];
 }
 
+u8 map_tile_at(u8 tx, u8 ty) {
+    if (tx >= PF_COLS || ty >= PF_ROWS) return TILE_GROUND; /* off-field fallback */
+    return s_maps[s_active_map_id].tilemap[ty * PF_COLS + tx];
+}
+
 const waypoint_t *map_waypoints(void) {
     return s_maps[s_active_map_id].waypoints;
 }

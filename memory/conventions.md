@@ -201,3 +201,13 @@ Direct enemy_t access from outside enemies.c is forbidden.
 - Title BG-write priority chain extended to 5 flags (iter-3 #19): `s_diff_dirty > s_map_dirty > s_focus_dirty > s_hi_dirty > s_dirty (prompt)`. Each branch services one per frame and returns. `s_hi_dirty` is set on title enter and after any difficulty/map cycle (the same handlers that already set `s_diff_dirty`/`s_map_dirty`). Per-frame BG-write cap (12) preserved: HI line is 9 tiles.
 - Pure-helper headers (iter-3 #19): `src/score_calc.h` and `src/save_calc.h` join the existing list (`tuning.h`, `game_modal.h`, `difficulty_calc.h`, `map_anim.h`, `enemies_anim.h`, `towers_anim.h`). Use `<stdint.h>` directly — never `gtypes.h`. All score-formula and save-serialization math lives in these headers for host testing.
 - Cartridge configuration (iter-3 #19): MBC1+RAM+BATTERY, 64 KB / 4 banks, 2 KB SRAM. Build flags `-Wl-yt0x03 -Wm-yo4 -Wm-ya1` (split prefixes — all-`-Wl-` form is silently ignored for `-yo`/`-ya`). `just check` asserts header bytes 0x147=0x03, 0x148=0x01, 0x149=0x01 and ROM size 65536. No `__banked` annotations needed; current code fits banks 0+1; banks 2-3 reserved for future.
+
+### Iter-4 #24 conventions (first-tower gate)
+- **Gate state lives in `game.c`** (no new `.c` module): `s_gate_active`, `s_gate_blink`, `s_gate_vis`, `s_gate_dirty`. All reset in `enter_playing()` only — NOT on pause-resume, NOT in `enter_title()`.
+- **Gate blocks waves by skipping `waves_update()`**: while `s_gate_active == 1`, `waves_update()` is not called and `s_gate_blink` increments instead. Zero changes to `waves.c`.
+- **Gate text**: "PLACEA" / "TOWER!" — 12 tiles total at screen (7, 8) and (7, 9). Initial paint during `DISPLAY_OFF` in `enter_playing()`.
+- **Blink rate**: 1 Hz (30-frame half-period), computed by `gate_blink_visible()` in the pure helper `src/gate_calc.h`. Counter freezes during pause/menu (incremented only in entity-update branch).
+- **Render order**: `hud_update → map_render → gate_render → towers_render → menu_render → pause_render`. Gate before towers so tower tile wins on overlap at gate-lift.
+- **BG-write budget with gate**: gate-lift frame = 3 (HUD E) + 12 (restore) + 1 (tower) = 16 (exactly at cap). B-button is gated on `!s_gate_active` to prevent A+B same-frame overflow to 17.
+- **`map_tile_at(u8 tx, u8 ty)`**: new accessor in `map.h`/`map.c` reading original tilemap tiles for play-field-local positions. Returns `TILE_GROUND` for out-of-bounds. Follows `map_class_at()` pattern.
+- **Pure-helper headers (extended)**: `src/gate_calc.h` joins the `<stdint.h>`-only family (`tuning.h`, `game_modal.h`, `*_anim.h`, `difficulty_calc.h`, `score_calc.h`, `save_calc.h`). Test coverage in `tests/test_gate.c`.
