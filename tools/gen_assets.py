@@ -515,6 +515,76 @@ TOWER3_BG_B = design_tile([
     "..o##o..",
 ])
 
+# Iter-4 #26: L1 (upgraded) tower BG tiles.
+# Design: L0 identity preserved + filled corners + denser/brighter center.
+# Each alt has a 1-pixel LED diff matching the L0 blink convention.
+
+TOWER_L1_BG = design_tile([
+    "#,o##o,#",
+    ",o####o,",
+    "o##oo##o",
+    "#o#,,#o#",
+    "#o#..#o#",
+    "o##oo##o",
+    ",o####o,",
+    "#,o##o,#",
+])
+
+TOWER_L1_BG_B = design_tile([
+    "#,o##o,#",
+    ",o####o,",
+    "o##oo##o",
+    "#o#,.#o#",
+    "#o#..#o#",
+    "o##oo##o",
+    ",o####o,",
+    "#,o##o,#",
+])
+
+TOWER2_L1_BG = design_tile([
+    "########",
+    "#o##o##o",
+    "########",
+    "o##,,#oo",
+    "########",
+    "#o##o##o",
+    "########",
+    "########",
+])
+
+TOWER2_L1_BG_B = design_tile([
+    "########",
+    "#o##o##o",
+    "########",
+    "o##.,#oo",
+    "########",
+    "#o##o##o",
+    "########",
+    "########",
+])
+
+TOWER3_L1_BG = design_tile([
+    ".,o##o.,",
+    ".o####o.",
+    "o######o",
+    "##o,,o##",
+    "##o,,o##",
+    "o######o",
+    ".o####o.",
+    ".,o##o.,",
+])
+
+TOWER3_L1_BG_B = design_tile([
+    ".,o##o.,",
+    ".o####o.",
+    "o######o",
+    "##o.,o##",
+    "##o,,o##",
+    "o######o",
+    ".o####o.",
+    ".,o##o.,",
+])
+
 map_tiles = [
     ('TILE_GROUND',   GROUND),
     ('TILE_PATH',     PATH),
@@ -541,6 +611,13 @@ map_tiles = [
     # Iter-3 #18: EMP tower base + idle blink.
     ('TILE_TOWER_3',    TOWER3_BG),
     ('TILE_TOWER_3_B',  TOWER3_BG_B),
+    # Iter-4 #26: L1 tower tiles.
+    ('TILE_TOWER_L1',      TOWER_L1_BG),
+    ('TILE_TOWER_L1_B',    TOWER_L1_BG_B),
+    ('TILE_TOWER_2_L1',    TOWER2_L1_BG),
+    ('TILE_TOWER_2_L1_B',  TOWER2_L1_BG_B),
+    ('TILE_TOWER_3_L1',    TOWER3_L1_BG),
+    ('TILE_TOWER_3_L1_B',  TOWER3_L1_BG_B),
 ]
 
 # ----------------------------------------------------------------------------
@@ -1090,7 +1167,13 @@ assets_h = """\
 #define TILE_TOWER_2_B  (MAP_TILE_BASE + 20)
 #define TILE_TOWER_3    (MAP_TILE_BASE + 21)
 #define TILE_TOWER_3_B  (MAP_TILE_BASE + 22)
-#define MAP_TILE_COUNT  23
+#define TILE_TOWER_L1     (MAP_TILE_BASE + 23)
+#define TILE_TOWER_L1_B   (MAP_TILE_BASE + 24)
+#define TILE_TOWER_2_L1   (MAP_TILE_BASE + 25)
+#define TILE_TOWER_2_L1_B (MAP_TILE_BASE + 26)
+#define TILE_TOWER_3_L1   (MAP_TILE_BASE + 27)
+#define TILE_TOWER_3_L1_B (MAP_TILE_BASE + 28)
+#define MAP_TILE_COUNT  29
 
 #define SPR_CURSOR_A    0
 #define SPR_CURSOR_B    1

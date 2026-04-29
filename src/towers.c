@@ -35,6 +35,7 @@ static const tower_stats_t s_tower_stats[TOWER_TYPE_COUNT] = {
         .damage = TOWER_AV_DAMAGE, .damage_l1 = TOWER_AV_DAMAGE_L1,
         .range_px = TOWER_AV_RANGE_PX,
         .bg_tile = TILE_TOWER, .bg_tile_alt = TILE_TOWER_B,
+        .bg_tile_l1 = TILE_TOWER_L1, .bg_tile_alt_l1 = TILE_TOWER_L1_B,
         .hud_letter = 'A', .kind = TKIND_DAMAGE,
         .stun_frames = 0, .stun_frames_l1 = 0,
     },
@@ -44,6 +45,7 @@ static const tower_stats_t s_tower_stats[TOWER_TYPE_COUNT] = {
         .damage = TOWER_FW_DAMAGE, .damage_l1 = TOWER_FW_DAMAGE_L1,
         .range_px = TOWER_FW_RANGE_PX,
         .bg_tile = TILE_TOWER_2, .bg_tile_alt = TILE_TOWER_2_B,
+        .bg_tile_l1 = TILE_TOWER_2_L1, .bg_tile_alt_l1 = TILE_TOWER_2_L1_B,
         .hud_letter = 'F', .kind = TKIND_DAMAGE,
         .stun_frames = 0, .stun_frames_l1 = 0,
     },
@@ -53,6 +55,7 @@ static const tower_stats_t s_tower_stats[TOWER_TYPE_COUNT] = {
         .damage = 0, .damage_l1 = 0,
         .range_px = TOWER_EMP_RANGE_PX,
         .bg_tile = TILE_TOWER_3, .bg_tile_alt = TILE_TOWER_3_B,
+        .bg_tile_l1 = TILE_TOWER_3_L1, .bg_tile_alt_l1 = TILE_TOWER_3_L1_B,
         .hud_letter = 'E', .kind = TKIND_STUN,
         .stun_frames = TOWER_EMP_STUN, .stun_frames_l1 = TOWER_EMP_STUN_L1,
     },
@@ -162,6 +165,8 @@ bool towers_upgrade(u8 idx) {
     if (!economy_try_spend(cost)) return false;
     s_towers[idx].level = 1;
     s_towers[idx].spent += cost;
+    s_towers[idx].dirty = 1;         /* iter-4 #26: schedule L1 tile repaint */
+    s_towers[idx].idle_phase = 0;    /* matches the about-to-be-painted L1 base tile */
     /* Iter-3 #18 F2: only damage towers reset cooldown on upgrade.
      * EMP (TKIND_STUN) preserves its current cooldown — its L0/L1 cadences
      * are identical (120), so resetting would force an idle EMP at
@@ -205,9 +210,10 @@ void towers_render(void) {
     /* Phase 2: at most 1 placement per frame. */
     for (i = 0; i < MAX_TOWERS; i++) {
         if (s_towers[i].alive && s_towers[i].dirty) {
+            const tower_stats_t *st = &s_tower_stats[s_towers[i].type];
             set_bkg_tile_xy(s_towers[i].tx,
                             s_towers[i].ty + HUD_ROWS,
-                            s_tower_stats[s_towers[i].type].bg_tile);
+                            s_towers[i].level ? st->bg_tile_l1 : st->bg_tile);
             s_towers[i].dirty = 0;
             return;         /* idle skipped this frame */
         }
@@ -227,8 +233,9 @@ void towers_render(void) {
         if (!s_towers[i].alive) continue;
         u8 want = towers_idle_phase_for(cur_frame, i);
         if (want == s_towers[i].idle_phase) continue;
-        u8 base = s_tower_stats[s_towers[i].type].bg_tile;
-        u8 alt  = s_tower_stats[s_towers[i].type].bg_tile_alt;
+        const tower_stats_t *st = &s_tower_stats[s_towers[i].type];
+        u8 base = s_towers[i].level ? st->bg_tile_l1     : st->bg_tile;
+        u8 alt  = s_towers[i].level ? st->bg_tile_alt_l1  : st->bg_tile_alt;
         set_bkg_tile_xy(s_towers[i].tx,
                         s_towers[i].ty + HUD_ROWS,
                         want ? alt : base);
