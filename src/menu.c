@@ -111,7 +111,7 @@ void menu_update(void) {
     if (input_is_pressed(J_A)) {
         if (s_sel == 0) {
             /* UPG: silently ignore at max level. */
-            if (towers_get_level(s_tower_idx) != 0) return;
+            if (towers_get_level(s_tower_idx) >= 2) return;
             if (towers_upgrade(s_tower_idx)) {
                 menu_close();
             }
@@ -191,7 +191,7 @@ void menu_render(void) {
     u8 type  = towers_get_type(s_tower_idx);
     u8 level = towers_get_level(s_tower_idx);
     const tower_stats_t *st = towers_stats(type);
-    u8 upg_cost = st->upgrade_cost;
+    u8 upg_cost = level == 0 ? st->upgrade_cost : st->upgrade_cost_l2;
     u8 refund   = towers_get_spent(s_tower_idx) / 2;
 
     /* Cursor cells */
@@ -204,7 +204,7 @@ void menu_render(void) {
     place_cell(CELL(0,3), mx, my, SPR_GLYPH_G);
     place_cell(CELL(0,4), mx, my, SPR_GLYPH_COLON);
     /* Digits row 0 */
-    if (level == 0) {
+    if (level < 2) {
         place_cell(CELL(0,5), mx, my, digit_glyph(upg_cost / 10));
         place_cell(CELL(0,6), mx, my, digit_glyph(upg_cost % 10));
     } else {

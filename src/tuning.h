@@ -85,4 +85,17 @@
 #define TOWER_EMP_STUN_L1       90   /* stun duration (frames), level 1 */
 #define TOWER_EMP_RANGE_PX      16
 
+/* Iter-4 #27: L2 tower stats */
+#define TOWER_AV_UPG_COST_L2   25
+#define TOWER_AV_COOLDOWN_L2   30
+#define TOWER_AV_DAMAGE_L2      3
+
+#define TOWER_FW_UPG_COST_L2   30
+#define TOWER_FW_COOLDOWN_L2   70
+#define TOWER_FW_DAMAGE_L2      6
+
+#define TOWER_EMP_UPG_COST_L2  20
+#define TOWER_EMP_COOLDOWN_L2 100
+#define TOWER_EMP_STUN_L2     120
+
 #endif /* GBTD_TUNING_H */

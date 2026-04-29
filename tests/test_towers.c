@@ -113,8 +113,13 @@ bool enemies_apply_damage(u8 idx, u8 dmg) {
 void enemies_set_flash(u8 idx) { (void)idx; }
 
 /* projectiles.h stubs */
+static u8 s_last_proj_damage;
+static int s_proj_fire_count;
+
 bool projectiles_fire(fix8 x, fix8 y, u8 target, u8 damage) {
-    (void)x; (void)y; (void)target; (void)damage;
+    (void)x; (void)y; (void)target;
+    s_last_proj_damage = damage;
+    s_proj_fire_count++;
     return true;
 }
 
@@ -152,6 +157,8 @@ static void reset_all(void) {
     s_stun_call_count = 0;
     s_sfx_count = 0;
     s_last_sfx = 0;
+    s_proj_fire_count = 0;
+    s_last_proj_damage = 0;
     s_energy = 255;
     towers_init();
 }
@@ -476,6 +483,147 @@ static void test_emp_fresh_placement_defers_one_frame(void) {
     CHECK_EQ(s_last_sfx, SFX_EMP_FIRE);
 }
 
+/* T_L2_1: L0→L1→L2 upgrade path, and can_upgrade gate at L2. */
+static void test_l2_can_upgrade_levels(void) {
+    reset_all();
+    CHECK(towers_try_place(5, 5, TOWER_AV));
+    i8 idx = towers_index_at(5, 5);
+    CHECK(idx >= 0);
+    CHECK(towers_can_upgrade((u8)idx));        /* L0: can */
+    CHECK(towers_upgrade((u8)idx));
+    CHECK_EQ(towers_get_level((u8)idx), 1);
+    CHECK(towers_can_upgrade((u8)idx));        /* L1: can */
+    CHECK(towers_upgrade((u8)idx));
+    CHECK_EQ(towers_get_level((u8)idx), 2);
+    CHECK(!towers_can_upgrade((u8)idx));       /* L2: cannot */
+    CHECK(!towers_upgrade((u8)idx));           /* upgrade fails */
+}
+
+/* T_L2_2: spent accumulates all 3 costs; sell refund = spent/2. */
+static void test_l2_spent_and_refund(void) {
+    reset_all();
+    s_energy = 255;
+    CHECK(towers_try_place(5, 5, TOWER_FW));
+    i8 idx = towers_index_at(5, 5);
+    CHECK(idx >= 0);
+    CHECK_EQ(towers_get_spent((u8)idx), TOWER_FW_COST);
+    CHECK(towers_upgrade((u8)idx));
+    CHECK_EQ(towers_get_spent((u8)idx), TOWER_FW_COST + TOWER_FW_UPG_COST);
+    CHECK(towers_upgrade((u8)idx));
+    CHECK_EQ(towers_get_spent((u8)idx),
+             TOWER_FW_COST + TOWER_FW_UPG_COST + TOWER_FW_UPG_COST_L2);
+    /* 15 + 20 + 30 = 65. Refund = 65/2 = 32. */
+    u8 energy_before = economy_get_energy();
+    towers_sell((u8)idx);
+    CHECK_EQ((u8)(economy_get_energy() - energy_before), 32);
+}
+
+/* T_L2_3: L2 AV fires with damage_l2. */
+static void test_l2_av_damage(void) {
+    reset_all();
+    s_energy = 255;
+    CHECK(towers_try_place(5, 5, TOWER_AV));
+    i8 idx = towers_index_at(5, 5);
+    CHECK(idx >= 0);
+    CHECK(towers_upgrade((u8)idx));  /* L1: cooldown set to 40 */
+    CHECK(towers_upgrade((u8)idx));  /* L2: cooldown set to 30 */
+    /* Place enemy in range: AV center = (44, 52), range = 24 px. */
+    place_enemy(0, 44, 52);
+    s_proj_fire_count = 0;
+    /* L2 AV cooldown=30. 30 frames to decrement to 0, then fires on 31st. */
+    for (int f = 0; f < 31; f++) towers_update();
+    CHECK(s_proj_fire_count > 0);
+    CHECK_EQ(s_last_proj_damage, TOWER_AV_DAMAGE_L2);
+}
+
+/* T_L2_4: L2 EMP stuns with stun_frames_l2. */
+static void test_l2_emp_stun_duration(void) {
+    reset_all();
+    s_energy = 255;
+    CHECK(towers_try_place(5, 5, TOWER_EMP));
+    i8 idx = towers_index_at(5, 5);
+    CHECK(idx >= 0);
+    CHECK(towers_upgrade((u8)idx));  /* L1: cooldown preserved (F2) */
+    CHECK(towers_upgrade((u8)idx));  /* L2: cooldown preserved (F2) */
+    CHECK_EQ(towers_get_level((u8)idx), 2);
+    /* Place enemy in range. */
+    place_enemy(0, 44, 52);
+    s_stun_call_count = 0;
+    /* Fresh-place cooldown=1, preserved across both upgrades.
+     * Frame 1: cooldown 1→0. Frame 2: cooldown=0 → fire. */
+    towers_update();
+    towers_update();
+    CHECK(s_stun_call_count > 0);
+    int found_l2 = 0;
+    for (int k = 0; k < s_stun_call_count; k++) {
+        if (s_stun_calls[k].result && s_stun_calls[k].frames == TOWER_EMP_STUN_L2)
+            found_l2 = 1;
+    }
+    CHECK(found_l2);
+}
+
+/* T_L2_5: L1→L2 EMP upgrade preserves cooldown (F2 regression). */
+static void test_l2_emp_upgrade_preserves_cooldown(void) {
+    reset_all();
+    s_energy = 255;
+    CHECK(towers_try_place(5, 5, TOWER_EMP));
+    i8 idx = towers_index_at(5, 5);
+    CHECK(idx >= 0);
+    /* Drain F3 fresh-place cooldown (1→0). */
+    towers_update();
+    /* Upgrade L0→L1. F2: cooldown preserved (still 0). */
+    CHECK(towers_upgrade((u8)idx));
+    /* Upgrade L1→L2. F2: cooldown preserved (still 0). */
+    CHECK(towers_upgrade((u8)idx));
+    CHECK_EQ(towers_get_level((u8)idx), 2);
+    /* Place enemy. Tower should fire immediately (cooldown=0). */
+    place_enemy(0, 44, 52);
+    s_stun_call_count = 0;
+    towers_update();
+    int succ = 0;
+    for (int k = 0; k < s_stun_call_count; k++) {
+        if (s_stun_calls[k].result && s_stun_calls[k].frames == TOWER_EMP_STUN_L2)
+            succ++;
+    }
+    CHECK_EQ(succ, 1);
+}
+
+/* T_L2_6: tower stats have correct L2 constants. */
+static void test_l2_tower_stats(void) {
+    const tower_stats_t *av = towers_stats(TOWER_AV);
+    const tower_stats_t *fw = towers_stats(TOWER_FW);
+    const tower_stats_t *emp = towers_stats(TOWER_EMP);
+    CHECK_EQ(av->damage_l2, TOWER_AV_DAMAGE_L2);
+    CHECK_EQ(av->cooldown_l2, TOWER_AV_COOLDOWN_L2);
+    CHECK_EQ(av->upgrade_cost_l2, TOWER_AV_UPG_COST_L2);
+    CHECK_EQ(fw->damage_l2, TOWER_FW_DAMAGE_L2);
+    CHECK_EQ(fw->cooldown_l2, TOWER_FW_COOLDOWN_L2);
+    CHECK_EQ(fw->upgrade_cost_l2, TOWER_FW_UPG_COST_L2);
+    CHECK_EQ(emp->stun_frames_l2, TOWER_EMP_STUN_L2);
+    CHECK_EQ(emp->cooldown_l2, TOWER_EMP_COOLDOWN_L2);
+    CHECK_EQ(emp->upgrade_cost_l2, TOWER_EMP_UPG_COST_L2);
+}
+
+/* T_L2_7: L2 towers render with L2 BG tiles. */
+static void test_l2_render_tiles(void) {
+    reset_all();
+    s_energy = 255;
+    CHECK(towers_try_place(5, 5, TOWER_AV));
+    i8 idx = towers_index_at(5, 5);
+    CHECK(idx >= 0);
+    /* Render the L0 placement (Phase 2). */
+    towers_render();
+    CHECK_EQ(s_bkg_tiles[5][5 + HUD_ROWS], TILE_TOWER);
+    /* Upgrade to L1, render. */
+    CHECK(towers_upgrade((u8)idx));
+    towers_render();
+    CHECK_EQ(s_bkg_tiles[5][5 + HUD_ROWS], TILE_TOWER_L1);
+    /* Upgrade to L2, render. */
+    CHECK(towers_upgrade((u8)idx));
+    towers_render();
+    CHECK_EQ(s_bkg_tiles[5][5 + HUD_ROWS], TILE_TOWER_L2);
+}
+
 int main(void) {
     test_emp_freshly_placed_cooldown_zero();
     test_emp_scan_all_in_range();
@@ -487,6 +635,13 @@ int main(void) {
     test_overlapping_emp_no_perma_freeze();
     test_emp_upgrade_preserves_cooldown();
     test_emp_fresh_placement_defers_one_frame();
+    test_l2_can_upgrade_levels();
+    test_l2_spent_and_refund();
+    test_l2_av_damage();
+    test_l2_emp_stun_duration();
+    test_l2_emp_upgrade_preserves_cooldown();
+    test_l2_tower_stats();
+    test_l2_render_tiles();
 
     if (failures) {
         fprintf(stderr, "test_towers: %d failure(s)\n", failures);

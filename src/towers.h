@@ -9,19 +9,25 @@ enum { TKIND_DAMAGE = 0, TKIND_STUN = 1 };
 typedef struct {
     u8  cost;
     u8  upgrade_cost;
-    u8  cooldown;       /* level 0 */
+    u8  upgrade_cost_l2;    /* L1→L2 cost (iter-4 #27) */
+    u8  cooldown;           /* level 0 */
     u8  cooldown_l1;
-    u8  damage;         /* only for TKIND_DAMAGE */
-    u8  damage_l1;      /* only for TKIND_DAMAGE */
-    u8  range_px;       /* level-independent */
-    u8  bg_tile;        /* TILE_TOWER / TILE_TOWER_2 / TILE_TOWER_3 */
-    u8  bg_tile_alt;    /* idle-blink tile per type (iter-3 #18) */
-    u8  bg_tile_l1;     /* L1 BG tile per type (iter-4 #26) */
-    u8  bg_tile_alt_l1; /* L1 idle-blink tile per type (iter-4 #26) */
-    u8  hud_letter;     /* 'A', 'F', or 'E' */
-    u8  kind;           /* TKIND_DAMAGE or TKIND_STUN */
-    u8  stun_frames;    /* only for TKIND_STUN — level 0 */
-    u8  stun_frames_l1; /* only for TKIND_STUN — level 1 */
+    u8  cooldown_l2;        /* level 2 (iter-4 #27) */
+    u8  damage;             /* only for TKIND_DAMAGE */
+    u8  damage_l1;          /* only for TKIND_DAMAGE */
+    u8  damage_l2;          /* only for TKIND_DAMAGE (iter-4 #27) */
+    u8  range_px;           /* level-independent */
+    u8  bg_tile;
+    u8  bg_tile_alt;
+    u8  bg_tile_l1;
+    u8  bg_tile_alt_l1;
+    u8  bg_tile_l2;         /* L2 BG tile (iter-4 #27) */
+    u8  bg_tile_alt_l2;     /* L2 idle-blink tile (iter-4 #27) */
+    u8  hud_letter;
+    u8  kind;               /* TKIND_DAMAGE or TKIND_STUN */
+    u8  stun_frames;        /* only for TKIND_STUN — level 0 */
+    u8  stun_frames_l1;     /* only for TKIND_STUN — level 1 */
+    u8  stun_frames_l2;     /* only for TKIND_STUN — level 2 (iter-4 #27) */
 } tower_stats_t;
 
 void towers_init(void);
@@ -36,8 +42,8 @@ const tower_stats_t *towers_stats(u8 type);
 u8   towers_get_type(u8 idx);
 u8   towers_get_level(u8 idx);
 u8   towers_get_spent(u8 idx);
-bool towers_can_upgrade(u8 idx);         /* level==0 && energy >= upgrade_cost */
-bool towers_upgrade(u8 idx);             /* spends, sets level=1 */
+bool towers_can_upgrade(u8 idx);         /* level<2 && energy >= next upgrade cost */
+bool towers_upgrade(u8 idx);             /* spends, increments level */
 void towers_sell(u8 idx);                /* refunds spent/2, schedules tile clear */
 
 /* Screen-pixel top-left of the tower's tile (for menu anchor). */
