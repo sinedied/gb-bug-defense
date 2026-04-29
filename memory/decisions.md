@@ -672,3 +672,15 @@
 - **Decision**: Changed sentinel to `{255, 255}`. Updated `range_preview.c` check to `dot.x == 255 && dot.y == 255`. Added regression test T7 in `test_range_calc.c` verifying that `range_calc_dot(28, 28, 40, 5)` returns `{0, 0}` (valid dot, not hidden).
 - **Rationale**: 255 is always off-screen — GB screen is 160×144. No valid dot position can ever be (255, 255).
 - **Alternatives**: Use a separate `bool visible` field in the struct (rejected — increases struct size and changes all call sites); use a return-code + out-param pattern (rejected — more complex API for a simple sentinel).
+
+### Iter-5: Performance optimization — dirty-flag menu_render, Manhattan early-reject targeting
+- **Date**: 2026-06-15
+- **Context**: Music audibly plays at ~half speed during gameplay, indicating per-frame CPU budget overruns on DMG. Three root causes identified: (1) `menu_render()` rewrites all 14 OAM sprites every frame while menu is open (content is static between selection changes); (2) `towers_update()` performs 16-bit multiplies for range checks on all alive enemies for every tower at cooldown=0; (3) `range_preview_update()` and `cursor_on_valid_tile()` each scan the 16-tower pool every frame regardless of cursor movement.
+- **Decision**: Five targeted optimizations — all behavior-preserving, no gameplay changes:
+  (1) `menu_render` dirty flag: only repaint OAM on open + selection change (eliminates ~28 GBDK calls/frame while menu open).
+  (2) Manhattan early-reject: `if (adx > range_px || ady > range_px) continue;` before the 16-bit multiply in both `acquire_target()` and the TKIND_STUN inner loop (mathematically proven conservative — never rejects a valid target).
+  (3) `range_preview_update`: early-return when `s_visible && cursor unchanged` (skip `towers_index_at` loop).
+  (4) `cursor_update` cache: only call `cursor_on_valid_tile()` when position changed or explicitly invalidated. New `cursor_invalidate_cache()` called from `towers_try_place()`/`towers_sell()`.
+  (5) `step_proj` dedup: cache `enemies_x_px`/`enemies_y_px` in locals (2 calls → 1 each).
+- **Rationale**: These are the cheapest, safest fixes for the three identified symptoms. Dirty-flag pattern is already used by HUD and title. Manhattan reject is mathematically sound and requires only two u8 comparisons. The cursor cache adds one cross-module dependency (`towers.c → cursor.h`) but keeps invalidation explicit and testable. Total WRAM cost: 4 bytes.
+- **Alternatives**: (a) Interleave tower updates across frames (rejected — changes firing timing, affects game balance); (b) Reduce pool sizes (rejected — changes difficulty); (c) Use lookup table for range_sq thresholds (rejected — ROM cost, maintenance burden, component check is equally effective); (d) Skip `entity_tick` second call in fast mode when budget exceeded (rejected — changes fast-mode behavior, frame-time measurement not available at runtime on DMG).

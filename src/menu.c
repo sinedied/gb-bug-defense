@@ -25,6 +25,7 @@
 static bool s_open;
 static u8   s_tower_idx;
 static u8   s_sel;        /* 0 = UPG, 1 = SEL */
+static u8   s_menu_dirty; /* iter-5: only repaint OAM on open or selection change */
 
 /* Iter-4 #25: BG save/restore state for menu background rectangle. */
 static u8 s_bg_col;              /* screen tile column of BG rect left edge */
@@ -65,6 +66,7 @@ void menu_init(void) {
     s_open = false;
     s_tower_idx = 0;
     s_sel = 0;
+    s_menu_dirty = 0;
     /* Iter-4 #25: clear BG save/restore state. */
     s_bg_col = 0;
     s_bg_row = 0;
@@ -82,6 +84,7 @@ void menu_open(u8 idx) {
     s_open = true;
     s_tower_idx = idx;
     s_sel = 0;
+    s_menu_dirty = 1;
     /* Iter-4 #25: compute BG rect position and arm save+clear. */
     compute_anchor(&mx, &my);
     s_bg_col = (mx / 8) + 1;   /* skip cursor column */
@@ -103,8 +106,8 @@ void menu_close(void) {
 
 void menu_update(void) {
     if (!s_open) return;
-    if (input_is_repeat(J_UP))   s_sel = 0;
-    if (input_is_repeat(J_DOWN)) s_sel = 1;
+    if (input_is_repeat(J_UP)   && s_sel != 0) { s_sel = 0; s_menu_dirty = 1; }
+    if (input_is_repeat(J_DOWN) && s_sel != 1) { s_sel = 1; s_menu_dirty = 1; }
 
     if (input_is_pressed(J_B)) {
         menu_close();
@@ -186,6 +189,9 @@ void menu_render(void) {
 
     if (!s_open) return;
 
+    /* Iter-5: skip OAM rewrite when nothing changed since last paint. */
+    if (!s_menu_dirty) return;
+
     compute_anchor(&mx, &my);
 
     /* Row 0: > U P G : Nh Nl   (cursor only when s_sel == 0) */
@@ -222,4 +228,6 @@ void menu_render(void) {
     place_cell(CELL(1,4), mx, my, SPR_GLYPH_COLON);
     place_cell(CELL(1,5), mx, my, digit_glyph(refund / 10));
     place_cell(CELL(1,6), mx, my, digit_glyph(refund % 10));
+
+    s_menu_dirty = 0;
 }

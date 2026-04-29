@@ -9,6 +9,12 @@ static u8  s_tx, s_ty;          /* play-field-local */
 static u8  s_blink;             /* frame counter */
 static bool s_blink_paused;     /* iter-2: menu freezes blink */
 
+/* Iter-5: cache the result of cursor_on_valid_tile() to avoid
+ * per-frame towers_at() when the cursor is stationary. */
+static u8   s_cache_tx;
+static u8   s_cache_ty;
+static bool s_cache_valid;
+
 void cursor_blink_pause(bool paused) { s_blink_paused = paused; }
 
 void cursor_init(void) {
@@ -16,8 +22,15 @@ void cursor_init(void) {
     s_ty = 0;
     s_blink = 0;
     s_blink_paused = false;
+    /* Iter-5: 0xFF is impossible PF coord (PF_COLS=20, PF_ROWS=17) so
+     * the first cursor_update() always recomputes. */
+    s_cache_tx = 0xFF;
+    s_cache_ty = 0xFF;
+    s_cache_valid = false;
     move_sprite(OAM_CURSOR, 0, 0); /* hidden until first update */
 }
+
+void cursor_invalidate_cache(void) { s_cache_tx = 0xFF; }
 
 bool cursor_on_valid_tile(void) {
     if (map_class_at(s_tx, s_ty) != TC_GROUND) return false;
@@ -42,7 +55,16 @@ void cursor_update(void) {
 
     s_blink++;
 
-    bool valid = cursor_on_valid_tile();
+    /* Iter-5: use cached validity when cursor hasn't moved. */
+    bool valid;
+    if (s_tx == s_cache_tx && s_ty == s_cache_ty) {
+        valid = s_cache_valid;
+    } else {
+        valid = cursor_on_valid_tile();
+        s_cache_tx = s_tx;
+        s_cache_ty = s_ty;
+        s_cache_valid = valid;
+    }
     /* Valid: 1 Hz blink (period 60). Invalid: 2 Hz (period 30).
      * When the menu has paused blink, hold the steady on-phase. */
     u8 phase;

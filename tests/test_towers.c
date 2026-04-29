@@ -132,6 +132,10 @@ void audio_play(u8 sfx_id) { s_last_sfx = sfx_id; s_sfx_count++; }
 u8 game_anim_frame(void) { return 0; }
 bool game_is_modal_open(void) { return false; }
 
+/* cursor.h stubs — iter-5: towers.c now calls cursor_invalidate_cache(). */
+void cursor_blink_pause(bool paused) { (void)paused; }
+void cursor_invalidate_cache(void) {}
+
 /* ---------------------------------------------------------------- */
 /* Test harness                                                      */
 /* ---------------------------------------------------------------- */

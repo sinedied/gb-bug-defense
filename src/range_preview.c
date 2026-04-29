@@ -40,6 +40,10 @@ void range_preview_hide(void) {
 void range_preview_update(u8 tx, u8 ty) {
     i8 idx;
 
+    /* Iter-5: if dots are already displayed and cursor hasn't moved,
+     * there is nothing to update — positions are static. */
+    if (tx == s_last_tx && ty == s_last_ty && s_visible) return;
+
     /* Step 1: check if cursor is on a tower. */
     idx = towers_index_at(tx, ty);
     if (idx < 0) {

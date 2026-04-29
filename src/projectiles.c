@@ -57,18 +57,19 @@ static void step_proj(u8 i) {
         move_sprite(OAM_PROJ_BASE + i, 0, 0);
         return;
     }
-    fix8 tx = (fix8)((i16)enemies_x_px(p->target) << 8);
-    fix8 ty = (fix8)((i16)enemies_y_px(p->target) << 8);
+    /* Iter-5: cache enemy position once instead of reading twice. */
+    u8 ex_px = enemies_x_px(p->target);
+    u8 ey_px = enemies_y_px(p->target);
+    fix8 tx = (fix8)((i16)ex_px << 8);
+    fix8 ty = (fix8)((i16)ey_px << 8);
     i16 ddx = tx - p->x;
     i16 ddy = ty - p->y;
 
     /* Hit check (squared pixel distance, unsigned). */
     i16 px = (i16)FIX8_INTU(p->x);
     i16 py = (i16)FIX8_INTU(p->y);
-    i16 ex = (i16)enemies_x_px(p->target);
-    i16 ey = (i16)enemies_y_px(p->target);
-    i16 dxp = ex - px;
-    i16 dyp = ey - py;
+    i16 dxp = (i16)ex_px - px;
+    i16 dyp = (i16)ey_px - py;
     u16 adxp = dxp < 0 ? (u16)-dxp : (u16)dxp;
     u16 adyp = dyp < 0 ? (u16)-dyp : (u16)dyp;
     u16 d2 = adxp * adxp + adyp * adyp;

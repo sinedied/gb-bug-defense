@@ -5,6 +5,7 @@
 #include "enemies.h"
 #include "projectiles.h"
 #include "audio.h"
+#include "cursor.h"
 #include "assets.h"
 #include "game.h"
 #include <gb/gb.h>
@@ -157,6 +158,7 @@ bool towers_try_place(u8 tx, u8 ty, u8 type) {
     s_towers[slot].dirty = 1;
     s_towers[slot].idle_phase = 0;   /* matches the about-to-be-painted base tile */
     audio_play(SFX_TOWER_PLACE);
+    cursor_invalidate_cache();       /* iter-5: tile is now occupied */
     return true;
 }
 
@@ -207,6 +209,7 @@ void towers_sell(u8 idx) {
     s_towers[idx].alive = 0;
     s_towers[idx].dirty = 0;
     audio_play(SFX_TOWER_PLACE);
+    cursor_invalidate_cache();       /* iter-5: tile is now empty */
 }
 
 void towers_render(void) {
@@ -265,7 +268,7 @@ void towers_render(void) {
 
 /* Targeting: pick alive enemy with highest wp_idx within range; tie-break
  * lower array index (= scan order). Returns 0xFF if none. */
-static u8 acquire_target(u8 cx_px, u8 cy_px, u16 range_sq) {
+static u8 acquire_target(u8 cx_px, u8 cy_px, u16 range_sq, u8 range_px) {
     u8 best = 0xFF;
     u8 best_wp = 0;
     u8 i;
@@ -275,6 +278,8 @@ static u8 acquire_target(u8 cx_px, u8 cy_px, u16 range_sq) {
         i16 dy = (i16)enemies_y_px(i) - (i16)cy_px;
         u16 adx = dx < 0 ? (u16)-dx : (u16)dx;
         u16 ady = dy < 0 ? (u16)-dy : (u16)dy;
+        /* Iter-5: cheap axis reject before 16-bit multiply. */
+        if (adx > (u16)range_px || ady > (u16)range_px) continue;
         u16 d2 = adx * adx + ady * ady;
         if (d2 > range_sq) continue;
         u8 wp = enemies_wp_idx(i);
@@ -320,6 +325,8 @@ void towers_update(void) {
                 i16 dy = (i16)enemies_y_px(j) - (i16)cy;
                 u16 adx = dx < 0 ? (u16)-dx : (u16)dx;
                 u16 ady = dy < 0 ? (u16)-dy : (u16)dy;
+                /* Iter-5: cheap axis reject before 16-bit multiply. */
+                if (adx > (u16)st->range_px || ady > (u16)st->range_px) continue;
                 u16 d2 = adx * adx + ady * ady;
                 if (d2 > range_sq) continue;
                 found_target = true;
@@ -338,7 +345,7 @@ void towers_update(void) {
             /* else: empty range — keep cooldown=0, re-scan next frame. */
         } else {
             /* TKIND_DAMAGE: acquire nearest, fire projectile. */
-            u8 t = acquire_target(cx, cy, range_sq);
+            u8 t = acquire_target(cx, cy, range_sq, st->range_px);
             if (t == 0xFF) continue;
             u8 lvl = s_towers[i].level;
             u8 dmg = lvl >= 2 ? st->damage_l2 : lvl ? st->damage_l1 : st->damage;
