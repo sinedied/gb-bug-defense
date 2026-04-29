@@ -1,4 +1,4 @@
-# justfile — GBTD build/run on macOS
+# justfile — Bug Defender build/run on macOS
 # Prereqs: `brew install just mgba`
 
 GBDK_VERSION := "4.2.0"
@@ -7,7 +7,7 @@ GBDK_DIR     := justfile_directory() + "/vendor/gbdk"
 LCC          := GBDK_DIR + "/bin/lcc"
 BUILD        := justfile_directory() + "/build"
 OBJ          := BUILD + "/obj"
-ROM          := BUILD + "/gbtd.gb"
+ROM          := BUILD + "/bugdefender.gb"
 
 default: run
 
@@ -56,7 +56,7 @@ build: setup
     set -euo pipefail
     mkdir -p "{{OBJ}}"
     "{{LCC}}" -Isrc -Ires \
-      -Wl-yt0x03 -Wm-yo4 -Wm-ya1 -Wm-yp0x149=0x01 \
+      -Wl-yt0x03 -Wm-yo4 -Wm-ya1 -Wm-yp0x149=0x01 -Wm-ynBUGDEFENDER \
       -o "{{ROM}}" \
       src/*.c res/assets.c
     SIZE=$(wc -c < "{{ROM}}" | tr -d ' ')

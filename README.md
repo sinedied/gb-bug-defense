@@ -1,7 +1,7 @@
-# GBTD — Game Boy Tower Defense
+# Bug Defender
 
-A monochrome Game Boy (DMG) tower-defense game where the player defends a
-desktop computer from waves of robot agents and "bugs" sent by a runaway AI.
+Bug Defender is a monochrome Game Boy (DMG) tower-defense game where the player
+defends a desktop computer from waves of robot agents and "bugs" sent by a runaway AI.
 Compiles to a real `.gb` ROM that runs on any DMG emulator (or real hardware
 via flashcart).
 
@@ -26,7 +26,7 @@ Other recipes:
 
 | Recipe         | Purpose                                   |
 |----------------|-------------------------------------------|
-| `just build`   | Compile sources → `build/gbtd.gb`         |
+| `just build`   | Compile sources → `build/bugdefender.gb`  |
 | `just check`   | Validate ROM exists, ≤ 32 KB, cart byte 0 |
 | `just emulator`| Launch mGBA on existing ROM (no rebuild)  |
 | `just assets`  | Regenerate `res/assets.{c,h}` (Python)    |

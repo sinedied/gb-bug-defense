@@ -534,3 +534,57 @@
  reset runs again cleanly.
 - **Rationale**: One-line reorder, no structural change, no ROM cost. Eliminates an entire failure class on real hardware. Single ENABLE_RAM/DISABLE_RAM window unchanged.
 - **Alternatives**: CRC over the slot table (over-engineered); shadow-copy two-phase commit (~50 extra bytes for 24 bytes of  not worth it).data 
+
+### Iter-4: Game rename to Bug Defender
+- **Date**: 2026-06-01
+- **Context**: User feedback: "GBTD isn't the game name: just a suggestion, maybe Bug Defender?"
+- **Decision**: Rename the game to "Bug Defender" in all user-visible locations. ROM header internal title = "BUGDEFENDER" (11 chars). Title screen text/logo, README, AGENTS.md, justfile output target (`build/bugdefender.gb`). Internal C namespace prefixes (`GBTD_` header guards) remain unchanged to avoid a codebase-wide refactor.
+- **Rationale**: "Bug Defender" is thematic (player literally defends against bugs), memorable, and fits the 11-char ROM header. Internal code prefixes are developer-facing and don't affect the player.
+- **Alternatives**: Keep "GBTD" (rejected — user explicitly requested a real name); "Cyber Defense" (too generic); full rename of all code identifiers (rejected — disproportionate refactor risk for zero user value).
+
+### Iter-4: Difficulty tier rename and rebalance
+- **Date**: 2026-06-01
+- **Context**: User feedback: (1) "In hard mode you can't even kill the monsters from the first wave" — HARD HP {5,9,16} with AV L0 damage=1 and cd=60 requires 300f per bug kill, but path traversal is 480f, making it mathematically near-impossible with starting energy of 24. (2) "Normal mode is too easy: should be the easy mode already" — NORMAL provides no real challenge.
+- **Decision**: Rename Easy→Casual, Hard→Veteran. Rebalance: Casual HP {1,3,6} (was {2,4,8}), Normal unchanged {3,6,12}, Veteran HP {4,7,14} (was {5,9,16}). Veteran starting energy 24→28. Spawn scaler unchanged. Math check: AV L0 vs Veteran bug HP=4 → 4 shots × 60f = 240f/kill, path=480f → 1 tower kills ~2 bugs. Two AV towers (20 energy from 28) kill ~4 of 5 wave-1 bugs. Viable with tight play.
+- **Rationale**: Veteran HP reduction is the minimum fix that makes wave 1 survivable. "Casual" is more welcoming than "Easy"; "Veteran" signals challenge without implying unfairness. "Normal" unchanged as the anchor tier — if users later say Normal is too easy, wave composition can be tuned separately.
+- **Alternatives**: Only reduce Veteran HP without renaming (rejected — user also said Normal felt like Easy, suggesting the naming itself sets wrong expectations); add a 4th difficulty (rejected — 3 tiers × 3 maps = 9 SRAM slots already; 4th tier = 12 slots, requires save format migration).
+
+### Iter-4: Tower upgrade depth = L0→L1→L2 (max 3 levels)
+- **Date**: 2026-06-01
+- **Context**: User feedback: "It would be nice to have more tower upgrades." Current max = L1.
+- **Decision**: Extend to L0→L1→L2 for all 3 tower types. L2 stats: AV (dmg 3, cd 30, cost 25), FW (dmg 6, cd 70, cost 30), EMP (stun 120f, cd 100, cost 20). `tower_stats_t` extended with `bg_tile_l2`, `bg_tile_alt_l2`, `upgrade_cost_l2`, and per-type L2 stat fields. `towers_can_upgrade` accepts level 0 or 1 (max=2). `menu.c` level guard changed from `!= 0` to `>= 2`. `towers_get_spent()` accumulates all costs for sell refund (max FW = 15+20+30 = 65, fits u8). L3+ deferred.
+- **Rationale**: One additional upgrade level is the minimum meaningful response to the feedback. It adds one new decision point per tower per game. L3+ has diminishing returns and would strain the BG tile budget (6 tiles per level × 3 types).
+- **Alternatives**: L0→L1→L2→L3 (rejected — diminishing returns, +18 tiles); type-branching upgrades (rejected — massive UI and balancing scope); L2 for some towers only (rejected — inconsistent UX).
+
+### Iter-4: Range preview uses OAM 1..8 (menu/pause range)
+- **Date**: 2026-06-01
+- **Context**: Adversarial review found that projectile OAM (31..38) is actively written by `projectiles_update()` during normal gameplay. Assigning range preview dots to those slots would corrupt both systems.
+- **Decision**: Range preview sprites use OAM 1..8 (a subset of the menu/pause shared range 1..16). This range is idle during normal gameplay (cleared by `menu_init()`/`pause_init()` on session start). `menu_open()` and `pause_open()` call `range_preview_hide()` alongside existing entity-hide calls.
+- **Rationale**: Zero OAM conflict. Menu/pause slots are definitionally idle when the cursor is on a tower in normal play (modals are mutually exclusive with gameplay input).
+- **Alternatives**: Projectile OAM 31..38 (rejected — actively written during gameplay); dedicated new OAM range (rejected — no free slots without shrinking enemy/projectile pools).
+
+### Iter-4: Speed-up toggle = entity-only double-tick
+- **Date**: 2026-06-01
+- **Context**: Adversarial review found that running full `game_update()` twice per frame would double-fire input dispatch, cursor movement, modal checks, and `s_anim_frame`.
+- **Decision**: SELECT toggles `s_fast_mode` in `playing_update()`. When active, only the entity-tick inner block (towers_update, enemies_update, projectiles_update, waves_update) runs a second time. economy_tick, audio_tick, input dispatch, cursor update, modal checks, s_anim_frame++, and gameover checks remain single-call. Wave-10 profiling on real DMG hardware required before shipping.
+- **Rationale**: Entity-only double-tick is the smallest correct unit of acceleration. Keeps input, audio, and animation at normal cadence while doubling game simulation speed.
+- **Alternatives**: Full game_update twice (rejected — doubles input/modal dispatch); frame-skip (rejected — visually jerky on DMG); timer manipulation (rejected — no user-space timer on DMG).
+
+### Iter-4: First-tower prompt at mid-screen BG rows 7–8
+- **Date**: 2026-06-01
+- **Context**: Adversarial review found that the HUD row is fully occupied (20 cols) with no room for a "PLACE A TOWER" string.
+- **Decision**: Display the prompt as a centered 2-line BG text block at play-field rows 7–8 (screen rows 8–9, below HUD). Text: "PLACE A" / "TOWER!" (12 tiles total). Blinks at 1 Hz. On gate lift (first tower placed), restore the 12 BG tiles from the map tilemap data. Consistent with pause-overlay mid-screen precedent.
+- **Rationale**: Mid-screen placement is unmissable. 12 BG-tile restore on gate lift is a one-time write well within budget (happens on the same frame as tower placement, which is already 1 BG write — total 13, under 16 cap).
+- **Alternatives**: Overwrite HUD wave field (rejected — stomps useful info); bottom-of-screen row (rejected — less visible, some maps have path tiles there).
+
+### Iter-4 #29 rename clarifications
+- **Date**: 2026-04-29
+- **Context**: Implementing the Bug Defender rename (iter-4 #29).
+- **Decision**: (1) AGENTS.md is unchanged — it contains no game-name text.
+  (2) SRAM magic bytes 'G','B','T','D' (save_calc.h) are preserved for
+  flash-cart save compatibility. (3) `GBTD_` C header-guard prefix is
+  retained (internal, never user-visible). (4) Historical QA/spec docs
+  are not updated — they are audit records of past state.
+- **Rationale**: Save-compat is non-negotiable for real hardware users.
+  Namespace prefix rename would touch 27+ files for zero user value.
+- **Alternatives**: None — these are constraint clarifications, not design choices.

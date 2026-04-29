@@ -5,7 +5,7 @@ following findings are verified by inspection + a scripted boot smoke
 test + the documented manual playthrough below. Run with:
 
     just check          # build + ROM size/header + host-side test_math
-    timeout 5 mgba -3 build/gbtd.gb   # boot smoke test (kill after 5s)
+    timeout 5 mgba -3 build/bugdefender.gb   # boot smoke test (kill after 5s)
 
 ## F1 — VRAM/BG writes during active scan
 **Automated:** none (LCD timing not observable from outside the emulator).
@@ -613,18 +613,18 @@ DMG / mGBA). Run them after any change to `src/music.c` or
    frame (worst-case 12 writes).
 
 ### Scenario 28: Fresh-cart cold boot (iter-3 #19)
-1. `rm -f build/gbtd.sav` then boot the ROM.
+1. `rm -f build/bugdefender.sav` then boot the ROM.
 2. **Expected**: title screen shows `HI: 00000` at row 15 cols 5..13.
    The `.sav` file is created with magic `GBTD` (0x47 0x42 0x54 0x44) +
    version 0x01 + pad 0x00, followed by 18 zero bytes (9 × u16
-   little-endian high scores). Verify with `xxd build/gbtd.sav | head -2`.
+   little-endian high scores). Verify with `xxd build/bugdefender.sav | head -2`.
 
 ### Scenario 29: Power-cycle persistence (iter-3 #19)
 1. Cycle title to Map 2 / HARD. Press START. Achieve any score (e.g.
    let one wave complete) and let HP fall to 0 to reach gameover.
    Press START to return to title. The `HI:` line for Map 2 / HARD
    should show the new score.
-2. Quit mGBA. Reopen `mgba build/gbtd.gb` (without deleting the
+2. Quit mGBA. Reopen `mgba build/bugdefender.gb` (without deleting the
    `.sav`).
 3. **Expected**: title selectors snap back to defaults (Map 1 /
    NORMAL — RAM-only state), but cycling to Map 2 / HARD on the title

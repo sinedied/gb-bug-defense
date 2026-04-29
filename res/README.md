@@ -1,6 +1,6 @@
 # res/
 
-Generated asset C arrays for GBTD.
+Generated asset C arrays for Bug Defender.
 
 `assets.c` and `assets.h` are produced by `tools/gen_assets.py` and committed
 to the repo so the standard build does not depend on Python at run time.

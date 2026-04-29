@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GBTD asset generator.
+Bug Defender asset generator.
 
 Emits res/assets.c + res/assets.h containing all tile pixel data,
 sprite tile data, and full-screen tilemaps for the title / win / lose
@@ -876,12 +876,11 @@ TILE_COMP_BR_D_IDX = MAP_TILE_BASE + 9
 
 def title_map():
     rows = [blank_row() for _ in range(18)]
-    rows[2]  = text_row("        GBTD        ")
-    rows[4]  = text_row("   TOWER  DEFENSE   ")
+    rows[2]  = text_row("    BUG DEFENDER    ")
     rows[6]  = text_row(" A RUNAWAY AI IS    ")
     rows[7]  = text_row(" SENDING THE BUGS   ")
     rows[13] = text_row("    PRESS START     ")
-    rows[16] = text_row("  (C) 2025 GBTD MVP ")
+    rows[16] = text_row("    (C) 2025 GBTD   ")
     return rows
 
 def win_map():
