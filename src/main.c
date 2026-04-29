@@ -2,6 +2,7 @@
 #include "gfx.h"
 #include "input.h"
 #include "audio.h"
+#include "save.h"
 #include "game.h"
 #include <gb/gb.h>
 
@@ -10,6 +11,7 @@ void main(void) {
     gfx_init();
     gfx_hide_all_sprites();
     audio_init();
+    save_init();      /* iter-3 #19: validate magic, hydrate hi cache */
     input_init();
     game_init();
 

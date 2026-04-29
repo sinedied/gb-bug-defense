@@ -499,3 +499,38 @@
   - `map_load(void)` reading `game_active_map()` internally ( would force `map.c` to depend on `game.h`, breaking host-test linkability).rejected 
 
 - Iter-3 #17 F1: Compile-time + host-test guard for MAP_SELECT_COUNT / MAP_COUNT sync. `#error` in `src/title.c` (after includes pull in both `map.h` via `game.h` and `map_select.h`) catches drift at ROM build; `CHECK_EQ(MAP_SELECT_COUNT, MAP_COUNT)` in `tests/test_maps.c` catches drift on host-test build. Negative regression verified: setting `MAP_SELECT_COUNT 4u` fails build with the `#error` and `just test` reports the assertion failure.
+
+### Iter-3 #19: MBC1+RAM cartridge conversion
+- **Date**: 2026-04-29
+- **Context**: Roadmap feature #19 requires per-map high-score persistence. Original MVP cart was no-MBC ROM-only (cart byte 0x147=0x00, ROM-size 0x148=0x00 → 32 KB, RAM-size 0x149=0x00). High-score storage requires battery-backed SRAM, which requires MBC1+RAM+BATTERY (0x147=0x03).
+- **Decision**: Flip cartridge to MBC1+RAM+BATTERY: 0x147=0x03, 0x148=0x01 (64 KB / 4 banks), 0x149=0x01 (2 KB / 1 bank). Build flags split per canonical GBDK example: `-Wl-yt0x03 -Wm-yo4 -Wm-ya1`. `just check` asserts the three header bytes and 65536 ROM size.
+- **Rationale**: 64 KB is the clean MBC1 minimum (avoids GBDK quirks with 32 KB MBC1 carts) and gives huge headroom over current ~28 KB usage. 2 KB SRAM is the smallest legal MBC1 RAM and stores all 24 needed bytes with room for future migration. Split flag form (`-Wl-yt`, `-Wm-yo`, `-Wm-ya`) mirrors `vendor/gbdk/examples/cross-platform/banks/Makefile` — the all-`-Wl-` form is silently ignored for `-yo`/`-ya`.
+- **Alternatives**: 32 KB MBC1 (legal but linker-quirky); 8 KB SRAM (overkill); all-`-Wm-` or all-`-Wl-` forms (latter silently rejected by lcc).
+
+### Iter-3 #19: SRAM save format
+- **Date**: 2026-04-29
+- **Context**: High-score persistence layout in SRAM at 0xA000.
+- **Decision**: 24-byte format: `'G','B','T','D'` magic (4) + version=0x01 (1) + pad (1) + 9 × u16 little-endian high-scores at offsets 6..23. Slot index = `map_id*3 + diff` for `map ∈ {0,1,2}`, `diff ∈ {EASY=0,NORMAL=1,HARD=2}`. On magic/version mismatch, save module zeroes all 9 slots and re-stamps a fresh header. Single-owner cache `static u16 s_hi[9]` lives in `save.c`; no other module caches.
+- **Rationale**: ASCII magic is self-documenting in hex dumps; version byte future-proofs migration; per-(map,diff) slots support meaningful HARD bragging rights at trivial 18-byte cost. Single-owner cache eliminates staleness risk.
+- **Alternatives**: Per-map only (3 slots, less granular); CRC checksum (over-engineered for 24 bytes); dual-cached in score.c too (staleness risk).
+
+### Iter-3 #19: Score formula and accumulation
+- **Date**: 2026-04-29
+- **Context**: Per-run score, separate from energy, for high-score system.
+- **Decision**: u16 score with saturation clamp at 0xFFFF. Per-kill base: BUG=10, ROBOT=25, ARMORED=50. Per-wave-clear bonus: `100 × wave_num`. Win bonus (all 10 waves cleared, HP > 0): 5000. Difficulty multiplier applied to every add: `(base × num) >> 3` with `num ∈ {EASY:8, NORMAL:12, HARD:16}` (effective ×1.0 / ×1.5 / ×2.0). Wave-clear edge fires on last-spawn-of-wave-N completes (the existing `s_cur++` edge in waves.c), exposed as `waves_just_cleared_wave()` one-shot. Save trigger: only at `enter_gameover` to minimize power-loss corruption window.
+- **Rationale**: u16 covers worst-case (~22000 HARD run) with headroom; clamp is defensive. Score separation from energy prevents exploit of energy hoarding. Integer multiplier with /8 base avoids floats. Last-spawn edge reuses existing state machine; per-wave drain tracking would need new enemy tagging.
+- **Alternatives**: u32 (wastes WRAM/tiles); shared with energy (exploitable); per-frame save (corruption risk); per-wave drain edge (needs enemy tagging).
+
+### Iter-3 #19 follow-up: makebin `-ya N` ↔ byte 0x149 mapping
+- **Date**: 2026-04-29
+- **Context**: Implementation revealed that the planner's research mapping `-Wm-ya1` → header byte 0x149=0x01 (2 KB) is incorrect. makebin's `-ya N` argument counts in 8 KB banks (one logical RAM bank = 8 KB on real MBC1), so `-ya1` → byte 0x149=0x02 (8 KB). To get the spec-required 0x149=0x01 (2 KB) we needed an extra `-Wm-yp0x149=0x01` byte-override after the bank-count flag.
+- **Decision**: Final flag set is `-Wl-yt0x03 -Wm-yo4 -Wm-ya1 -Wm-yp0x149=0x01`. The `-ya1` allocation request stays for makebin's internal sizing; the `-yp` override patches the header byte to the correct 2 KB value. `just check` asserts the resulting byte regardless of flag form, so a future makebin behaviour change still surfaces as a CI failure.
+- **Rationale**: Byte 0x149 is the only on-cart RAM-size advertisement; emulators allocate SRAM based on it. 2 KB (0x01) is what the spec asked for and is sufficient (24 B used). makebin emits a `caution: -yp0x0149=0x01 is outdated` notice but the override is functionally correct and the resulting header checksum recomputes properly (verified at 0x14D = 0x4E).
+- **Alternatives**: Accept 0x149=0x02 (8 KB — functionally identical for our 24-byte payload, but contradicts the spec); modify GBDK's makebin (not portable across user installs).
+
+### Iter-3 #19 F1: Fresh-cart SRAM reset is failure-atomic
+- **Date**: 2026-04-29
+- **Context**: Adversarial review  the original reset path in `save_init` stamped magic+version BEFORE zeroing the 9 score slots. If power was lost mid-reset, the next boot saw a valid header + stale/garbage score bytes, causing bogus high scores to surface ( on a future version-bump  old-format bytes reinterpreted as valid).reset or F1 
+ reset runs again cleanly.
+- **Rationale**: One-line reorder, no structural change, no ROM cost. Eliminates an entire failure class on real hardware. Single ENABLE_RAM/DISABLE_RAM window unchanged.
+- **Alternatives**: CRC over the slot table (over-engineered); shadow-copy two-phase commit (~50 extra bytes for 24 bytes of  not worth it).data 

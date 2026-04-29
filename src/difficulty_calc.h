@@ -67,4 +67,16 @@ static inline uint8_t difficulty_cycle_right(uint8_t diff) {
     return (diff >= 2) ? 0u : (uint8_t)(diff + 1u);
 }
 
+/* Iter-3 #19: per-difficulty score multiplier numerator (denominator 8).
+ *   EASY   = 8  (×1.0)
+ *   NORMAL = 12 (×1.5)
+ *   HARD   = 16 (×2.0)
+ * Garbage difficulty falls back to NORMAL. Applied as
+ * `score_apply_mult(base, num) = (base * num) >> 3` (see score_calc.h). */
+static inline uint8_t difficulty_score_mult_num(uint8_t diff) {
+    if (diff == 0u) return 8u;
+    if (diff == 2u) return 16u;
+    return 12u;
+}
+
 #endif /* GBTD_DIFFICULTY_CALC_H */

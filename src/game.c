@@ -15,6 +15,8 @@
 #include "music.h"
 #include "menu.h"
 #include "pause.h"
+#include "save.h"
+#include "score.h"
 #include "game_modal.h"
 #include "tower_select.h"
 #include <gb/gb.h>
@@ -91,6 +93,7 @@ static void enter_playing(void) {
     audio_reset();
     DISPLAY_ON;
     s_anim_frame = 0;     /* iter-3 #21: deterministic phase per session */
+    score_reset();        /* iter-3 #19: per-run score accumulator */
     /* Iter-3 #16: in-game music starts after audio_reset() (which calls
      * music_reset()), so no overlap with the title loop. */
     music_play(MUS_PLAYING);
@@ -98,12 +101,23 @@ static void enter_playing(void) {
 }
 
 static void enter_gameover(bool win) {
-    /* Iter-3 #16: WIN/LOSE music stinger replaces the iter-2 SFX_WIN/
-     * SFX_LOSE jingle (D-MUS-3). music_play is synchronous-arm, so the
-     * stinger's first note plays even though gameover_enter() blocks the
-     * main loop for several frames during DISPLAY_OFF + redraw. */
-    music_play(win ? MUS_WIN : MUS_LOSE);
-    gameover_enter(win);
+    /* Iter-3 #19: finalise score (win bonus first, then commit to SRAM
+     * if it's a record). Save writes happen ONLY here — never per-frame,
+     * never mid-game. The same record check also drives the gameover
+     * banner. */
+    if (win) score_add_win_bonus();
+    {
+        u16 sc  = score_get();
+        u8  m   = game_active_map();
+        u8  d   = game_difficulty();
+        bool rec = sc > save_get_hi(m, d);
+        if (rec) save_write_hi(m, d, sc);
+        /* Iter-3 #16: WIN/LOSE music stinger. music_play is synchronous-
+         * arm so the stinger's first note plays even though
+         * gameover_enter() blocks the main loop for several frames. */
+        music_play(win ? MUS_WIN : MUS_LOSE);
+        gameover_enter(win, sc, rec);
+    }
     s_state = win ? GS_WIN : GS_LOSE;
 }
 
@@ -169,6 +183,13 @@ static void playing_update(void) {
         enemies_update();
         projectiles_update();
         waves_update();
+        /* Iter-3 #19: drain wave-clear edge into score. One-shot per
+         * cleared wave; runs only on the normal entity-update path so
+         * pause/menu modes can't fire it. */
+        {
+            u8 cleared = waves_just_cleared_wave();
+            if (cleared) score_add_wave_clear(cleared);
+        }
     }
     economy_tick();   /* runs even with menu open — D19 */
     audio_tick();     /* runs always so SFX continue during menu */

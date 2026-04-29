@@ -42,15 +42,21 @@ assets:
     set -euo pipefail
     python3 tools/gen_assets.py res/
 
-# Compile and link the ROM. GBDK defaults are correct for DMG: no MBC,
-# 2 ROM banks (32 KB), DMG-only header, automatic header checksum + Nintendo
-# logo. (Spec called for `-Wm-yC` / `-Wm-yo1` but those mean "CGB only" /
-# "1 bank = 16 KB" in makebin — see memory/decisions.md.)
+# Compile and link the ROM. Iter-3 #19: cart conversion to MBC1+RAM+BATT
+# 64 KB / 2 KB SRAM. Flag form is split per the canonical GBDK example
+# (`vendor/gbdk/examples/cross-platform/banks/Makefile`):
+#   -Wl-yt0x03  → linker → byte 0x147 = 0x03 (MBC1+RAM+BATTERY)
+#   -Wm-yo4     → makebin → 4 ROM banks = 64 KB, byte 0x148 = 0x01
+#   -Wm-ya1     → makebin → 1 RAM bank  = 2 KB,  byte 0x149 = 0x01
+# The all-`-Wl-` form is silently ignored for `-yo`/`-ya`; `just check`
+# asserts the resulting header bytes so any flag-rejection regression
+# fails CI.
 build: setup
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "{{OBJ}}"
     "{{LCC}}" -Isrc -Ires \
+      -Wl-yt0x03 -Wm-yo4 -Wm-ya1 -Wm-yp0x149=0x01 \
       -o "{{ROM}}" \
       src/*.c res/assets.c
     SIZE=$(wc -c < "{{ROM}}" | tr -d ' ')
@@ -62,14 +68,29 @@ check: build test
     set -euo pipefail
     test -f "{{ROM}}"
     SIZE=$(wc -c < "{{ROM}}" | tr -d ' ')
-    if [ "$SIZE" -gt 32768 ]; then
-      echo "ROM > 32KB: $SIZE"; exit 1
+    if [ "$SIZE" -ne 65536 ]; then
+      echo "ROM size != 65536 (got $SIZE)"; exit 1
     fi
     CT=$(xxd -s 0x147 -l 1 -p "{{ROM}}")
-    if [ "$CT" != "00" ]; then
-      echo "Cart type != 0x00 (got $CT)"; exit 1
+    RS=$(xxd -s 0x148 -l 1 -p "{{ROM}}")
+    RA=$(xxd -s 0x149 -l 1 -p "{{ROM}}")
+    if [ "$CT" != "03" ]; then
+      echo "Cart type != 0x03 (got 0x$CT)"; exit 1
     fi
-    echo "ROM check OK ($SIZE bytes, cart=0x$CT, ≤ 32 KB)"
+    if [ "$RS" != "01" ]; then
+      echo "ROM size byte 0x148 != 0x01 (got 0x$RS)"; exit 1
+    fi
+    if [ "$RA" != "01" ]; then
+      echo "RAM size byte 0x149 != 0x01 (got 0x$RA)"; exit 1
+    fi
+    # Pan Docs header checksum (0x134..0x14C → byte 0x14D).
+    EXPECT=$(od -An -tu1 -j 0x134 -N 25 "{{ROM}}" \
+      | awk 'BEGIN{s=0} {for(i=1;i<=NF;i++){s=(s-$i-1)%256}} END{if(s<0)s+=256; printf "%02x", s}')
+    GOT=$(xxd -s 0x14D -l 1 -p "{{ROM}}")
+    if [ "$EXPECT" != "$GOT" ]; then
+      echo "Header checksum mismatch: expect=$EXPECT got=$GOT"; exit 1
+    fi
+    echo "ROM check OK ($SIZE bytes, cart=0x$CT, rom=0x$RS, ram=0x$RA, hdr=0x$GOT)"
 
 # Host-side regression tests (no GBDK; uses system cc).
 test:
@@ -136,6 +157,22 @@ test:
     cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc -Ires \
        tests/test_maps.c res/assets.c -o "{{BUILD}}/test_maps"
     "{{BUILD}}/test_maps"
+    # test_save (iter-3 #19) exercises save_calc.h pure helpers and
+    # save.c via mocked SRAM (stub gb.h provides ENABLE_RAM/DISABLE_RAM/
+    # SWITCH_RAM macros backed by g_rRAMG/g_rRAMB; stub hardware.h
+    # provides _SRAM via g_sram[2048]). Verifies fresh-cart stamp,
+    # valid-magic hydrate, write/read round-trip, > replacement, and
+    # per-slot isolation.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
+       tests/test_save.c src/save.c -o "{{BUILD}}/test_save"
+    "{{BUILD}}/test_save"
+    # test_score (iter-3 #19) exercises score_calc.h pure helpers,
+    # difficulty_score_mult_num, and src/score.c with a stub
+    # game_difficulty(). Covers each enemy/wave base, each difficulty
+    # multiplier, win bonus, and u16 saturation at 0xFFFF.
+    cc -std=c99 -Wall -Wextra -O2 -Itests/stubs -Isrc \
+       tests/test_score.c src/score.c -o "{{BUILD}}/test_score"
+    "{{BUILD}}/test_score"
 
 # Build + launch emulator (one-command playtest)
 #

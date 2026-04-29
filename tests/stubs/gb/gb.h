@@ -23,4 +23,14 @@ void move_sprite(unsigned char nb, unsigned char x, unsigned char y);
 void set_sprite_tile(unsigned char nb, unsigned char tile);
 void set_bkg_tile_xy(unsigned char x, unsigned char y, unsigned char tile);
 
+/* Iter-3 #19: SRAM access protocol macros. The test binary supplies
+ * the backing storage (`g_rRAMG`, `g_rRAMB`). save.c uses these via
+ * ENABLE_RAM/DISABLE_RAM/SWITCH_RAM, identical token form to the real
+ * <gb/gb.h>. */
+extern unsigned char g_rRAMG;
+extern unsigned char g_rRAMB;
+#define ENABLE_RAM   (g_rRAMG = 0x0A)
+#define DISABLE_RAM  (g_rRAMG = 0x00)
+#define SWITCH_RAM(b) (g_rRAMB = (unsigned char)(b))
+
 #endif

@@ -109,13 +109,21 @@ static u8  s_state;
 static u8  s_cur;       /* 0..MAX_WAVES; once == MAX_WAVES -> WS_DONE */
 static u8  s_event_idx;
 static u16 s_timer;
+static u8  s_just_cleared;   /* iter-3 #19 one-shot edge */
 
 void waves_init(void) {
     s_state     = WS_DELAY;
     s_cur       = 0;
     s_event_idx = 0;
     s_timer     = FIRST_GRACE;
+    s_just_cleared = 0;
     hud_mark_w_dirty();
+}
+
+u8 waves_just_cleared_wave(void) {
+    u8 v = s_just_cleared;
+    s_just_cleared = 0;
+    return v;
 }
 
 u8 waves_get_current(void) {
@@ -148,6 +156,10 @@ void waves_update(void) {
         s_event_idx++;
         if (s_event_idx >= s_waves[s_cur].count) {
             u16 nxt_delay = s_waves[s_cur].inter_delay;
+            /* Iter-3 #19: arm "wave N just cleared" edge. s_cur is
+             * still 0-based here, so s_cur + 1 is the 1-based wave
+             * number that just finished spawning. Cleared on read. */
+            s_just_cleared = s_cur + 1u;
             s_cur++;
             hud_mark_w_dirty();
             if (s_cur >= MAX_WAVES) {

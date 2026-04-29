@@ -69,4 +69,10 @@ extern unsigned int  g_write_log_len;
 extern unsigned char g_wave_ram[16];
 #define _AUD3WAVERAM g_wave_ram
 
+/* Iter-3 #19: SRAM stub — 2 KB byte-addressable region at 0xA000 on real
+ * hardware. Tests provide `g_sram[2048]`; save.c reads/writes via
+ * `_SRAM[i]`. */
+extern unsigned char g_sram[2048];
+#define _SRAM g_sram
+
 #endif

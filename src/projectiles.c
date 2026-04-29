@@ -2,6 +2,7 @@
 #include "enemies.h"
 #include "economy.h"
 #include "audio.h"
+#include "score.h"
 #include "assets.h"
 #include <gb/gb.h>
 
@@ -72,14 +73,18 @@ static void step_proj(u8 i) {
     u16 adyp = dyp < 0 ? (u16)-dyp : (u16)dyp;
     u16 d2 = adxp * adxp + adyp * adyp;
     if (d2 <= (u16)PROJ_HIT_SQ) {
-        /* Capture bounty BEFORE the damage call: enemies_apply_damage may
-         * free the slot, and a same-frame enemies_spawn could reassign it
-         * to a different type whose bounty would otherwise be wrongly
-         * credited. (See specs/iter2.md §3 F5.) */
+        /* Capture bounty AND enemy type BEFORE the damage call: the
+         * call may free the slot, and a same-frame enemies_spawn could
+         * reassign it to a different type whose bounty/score-base would
+         * otherwise be wrongly credited. (See specs/iter2.md §3 F5 and
+         * the bounty-capture convention; iter-3 #19 extends it to score
+         * type.) */
         u8 bounty = enemies_bounty(p->target);
+        u8 etype  = enemies_type(p->target);
         bool killed = enemies_apply_damage(p->target, p->damage);
         if (killed) {
             economy_award(bounty);
+            score_add_kill(etype);
             audio_play(SFX_ENEMY_DEATH);
         } else {
             /* Iter-3 #21: arm 3-frame hit-flash. enemies_set_flash()

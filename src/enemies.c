@@ -98,6 +98,7 @@ u8   enemies_y_px(u8 idx)     { return FIX8_INTU(s_enemies[idx].y); }
 u8   enemies_wp_idx(u8 idx)   { return s_enemies[idx].wp_idx; }
 u8   enemies_gen(u8 idx)      { return s_enemies[idx].gen; }
 u8   enemies_bounty(u8 idx)   { return s_enemy_stats[s_enemies[idx].type].bounty; }
+u8   enemies_type(u8 idx)     { return s_enemies[idx].type; }
 
 void enemies_set_flash(u8 idx) {
     if (idx >= MAX_ENEMIES) return;

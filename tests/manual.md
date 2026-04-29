@@ -611,3 +611,53 @@ DMG / mGBA). Run them after any change to `src/music.c` or
 2. **Expected**: No tile flicker on selector or prompt during the
    30-frame blink edge. `title_render` services one dirty flag per
    frame (worst-case 12 writes).
+
+### Scenario 28: Fresh-cart cold boot (iter-3 #19)
+1. `rm -f build/gbtd.sav` then boot the ROM.
+2. **Expected**: title screen shows `HI: 00000` at row 15 cols 5..13.
+   The `.sav` file is created with magic `GBTD` (0x47 0x42 0x54 0x44) +
+   version 0x01 + pad 0x00, followed by 18 zero bytes (9 × u16
+   little-endian high scores). Verify with `xxd build/gbtd.sav | head -2`.
+
+### Scenario 29: Power-cycle persistence (iter-3 #19)
+1. Cycle title to Map 2 / HARD. Press START. Achieve any score (e.g.
+   let one wave complete) and let HP fall to 0 to reach gameover.
+   Press START to return to title. The `HI:` line for Map 2 / HARD
+   should show the new score.
+2. Quit mGBA. Reopen `mgba build/gbtd.gb` (without deleting the
+   `.sav`).
+3. **Expected**: title selectors snap back to defaults (Map 1 /
+   NORMAL — RAM-only state), but cycling to Map 2 / HARD on the title
+   shows the persisted score from the previous run. mGBA writes/loads
+   the `.sav` automatically.
+
+### Scenario 30: NEW HIGH SCORE banner — win and lose paths (iter-3 #19)
+1. With a fresh `.sav` (HI=0), play a normal run and reach gameover in
+   any way (win or lose). Score will be > 0 because at least one kill
+   or wave-clear has occurred.
+2. **Expected**: gameover shows `NEW HIGH SCORE!` at row 13 cols 2..16
+   above `SCORE: NNNNN` at row 14 cols 4..15. Banner is STATIC (does
+   not blink). Only `PRESS START` at row 15 blinks.
+3. Replay and intentionally underperform (don't place towers).
+4. **Expected**: gameover shows only `SCORE:` line; no banner. The
+   stored HI is unchanged.
+5. Repeat step 1 but reach gameover via HP=0.
+6. **Expected**: banner appears on the LOSE screen too — record check
+   is `score > prior_hi` regardless of win/lose state.
+
+### Scenario 31: Per-(map, difficulty) high-score isolation (iter-3 #19)
+1. Set a non-zero HI on Map 3 / HARD (play a brief run; gameover
+   commits the score).
+2. Cycle title selectors to Map 1 / EASY.
+3. **Expected**: `HI:` line shows `00000` (or whatever value Map 1 /
+   EASY previously held). Each of the 9 (map, difficulty) slots is
+   independent; cycling back to Map 3 / HARD restores the saved value
+   within one frame (BG-write priority chain services `s_hi_dirty`
+   after the selector flag).
+
+### Scenario 32: Title HI updates on selector cycle (iter-3 #19)
+1. On title, focus the difficulty selector and press LEFT/RIGHT.
+2. **Expected**: the `HI:` line on row 15 reflects the new
+   (map, difficulty) slot's stored score within one frame of the
+   selector update (priority chain order: diff → map → focus → hi →
+   prompt; each branch clears one dirty flag per frame).

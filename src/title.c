@@ -5,6 +5,7 @@
 #include "game.h"
 #include "difficulty_calc.h"
 #include "map_select.h"
+#include "save.h"
 #include <gb/gb.h>
 
 #if MAP_SELECT_COUNT != MAP_COUNT
@@ -45,12 +46,20 @@
 
 #define FOCUS_COL   3
 
+/* Iter-3 #19: HI line at row 15 cols 5..13 (9 tiles). Static, recomputed
+ * when difficulty or map cycles. Inserted in the priority chain
+ * AFTER s_focus_dirty, BEFORE s_dirty (prompt blink). 9 writes/frame. */
+#define HI_ROW     15
+#define HI_COL      5
+#define HI_W        9
+
 static u8   s_blink;
 static bool s_visible;
 static bool s_dirty;
 static u8   s_diff_dirty;
 static u8   s_map_dirty;
 static u8   s_focus_dirty;
+static u8   s_hi_dirty;
 static u8   s_title_focus;     /* 0 = difficulty, 1 = map */
 static const char s_prompt[PROMPT_LEN + 1] = "PRESS START ";
 static const char *const s_diff_labels[3] = { " EASY ", "NORMAL", " HARD " };
@@ -98,6 +107,28 @@ static void draw_focus_now(void) {
     set_bkg_tile_xy(FOCUS_COL, focused_row(),   (u8)'>');
 }
 
+/* Iter-3 #19: paint `HI: NNNNN` at row 15 cols 5..13. 9 writes total.
+ * Re-reads from save.c on each call; no local cache (single-owner
+ * convention — high-score cache lives only in save.c). */
+static void draw_hi_now(void) {
+    u16 v = save_get_hi(game_active_map(), game_difficulty());
+    /* 5-digit zero-padded decimal — manual unrolled to avoid printf. */
+    u8  d[5];
+    u8  i;
+    d[4] = (u8)(v % 10u); v /= 10u;
+    d[3] = (u8)(v % 10u); v /= 10u;
+    d[2] = (u8)(v % 10u); v /= 10u;
+    d[1] = (u8)(v % 10u); v /= 10u;
+    d[0] = (u8)(v % 10u);
+    set_bkg_tile_xy(HI_COL + 0, HI_ROW, (u8)'H');
+    set_bkg_tile_xy(HI_COL + 1, HI_ROW, (u8)'I');
+    set_bkg_tile_xy(HI_COL + 2, HI_ROW, (u8)':');
+    set_bkg_tile_xy(HI_COL + 3, HI_ROW, (u8)' ');
+    for (i = 0; i < 5; i++) {
+        set_bkg_tile_xy(HI_COL + 4 + i, HI_ROW, (u8)('0' + d[i]));
+    }
+}
+
 void title_enter(void) {
     gfx_hide_all_sprites();
     /* Render the title screen tilemap (20x18). 360 BG writes — bracket with
@@ -111,10 +142,12 @@ void title_enter(void) {
     s_diff_dirty = 0;
     s_map_dirty = 0;
     s_focus_dirty = 0;
+    s_hi_dirty = 0;
     draw_prompt_now(true);
     draw_diff_now();
     draw_map_now();
     draw_focus_now();
+    draw_hi_now();
     DISPLAY_ON;
 }
 
@@ -134,17 +167,21 @@ void title_update(void) {
         if (s_title_focus == 0) {
             game_set_difficulty(difficulty_cycle_left(game_difficulty()));
             s_diff_dirty = 1;
+            s_hi_dirty = 1;
         } else {
             game_set_active_map(map_cycle_left(game_active_map()));
             s_map_dirty = 1;
+            s_hi_dirty = 1;
         }
     } else if (input_is_pressed(J_RIGHT)) {
         if (s_title_focus == 0) {
             game_set_difficulty(difficulty_cycle_right(game_difficulty()));
             s_diff_dirty = 1;
+            s_hi_dirty = 1;
         } else {
             game_set_active_map(map_cycle_right(game_active_map()));
             s_map_dirty = 1;
+            s_hi_dirty = 1;
         }
     }
 
@@ -176,6 +213,11 @@ void title_render(void) {
     if (s_focus_dirty) {
         draw_focus_now();
         s_focus_dirty = 0;
+        return;
+    }
+    if (s_hi_dirty) {
+        draw_hi_now();
+        s_hi_dirty = 0;
         return;
     }
     if (s_dirty) {

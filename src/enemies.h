@@ -16,6 +16,7 @@ u8   enemies_y_px(u8 idx);
 u8   enemies_wp_idx(u8 idx);
 u8   enemies_gen(u8 idx);
 u8   enemies_bounty(u8 idx);          /* iter-2: bounty for the alive enemy */
+u8   enemies_type(u8 idx);            /* iter-3 #19: type for score_add_kill */
 
 /* Damage callback used by projectiles. Returns true if the hit killed it. */
 bool enemies_apply_damage(u8 idx, u8 dmg);
