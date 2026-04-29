@@ -312,7 +312,7 @@ void towers_update(void) {
              * polling at cooldown=0 every frame would always grab the
              * unstun frame on its rival's expiry and chain-lock the
              * enemy forever (towers_update runs before enemies_update).
-             * (c) no targets in range → keep cooldown=0, retry next frame. */
+             * (c) no targets in range → set idle rescan delay (Iter-6). */
             bool any_stunned = false;
             bool found_target = false;
             u8 lvl = s_towers[i].level;
@@ -341,12 +341,20 @@ void towers_update(void) {
                 /* All targets already stunned — burn cooldown, no SFX. */
                 s_towers[i].cooldown = lvl >= 2 ? st->cooldown_l2
                                      : lvl      ? st->cooldown_l1 : st->cooldown;
+            } else {
+                /* Iter-6: empty range — idle rescan delay instead of
+                 * scanning every frame. -1 so actual latency = TOWER_IDLE_RESCAN frames. */
+                s_towers[i].cooldown = TOWER_IDLE_RESCAN - 1;
             }
-            /* else: empty range — keep cooldown=0, re-scan next frame. */
         } else {
             /* TKIND_DAMAGE: acquire nearest, fire projectile. */
             u8 t = acquire_target(cx, cy, range_sq, st->range_px);
-            if (t == 0xFF) continue;
+            if (t == 0xFF) {
+                /* Iter-6: no target — idle rescan delay.
+                 * -1 so actual latency = TOWER_IDLE_RESCAN frames. */
+                s_towers[i].cooldown = TOWER_IDLE_RESCAN - 1;
+                continue;
+            }
             u8 lvl = s_towers[i].level;
             u8 dmg = lvl >= 2 ? st->damage_l2 : lvl ? st->damage_l1 : st->damage;
             if (projectiles_fire(FIX8(cx), FIX8(cy), t, dmg)) {

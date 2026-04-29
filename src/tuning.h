@@ -66,6 +66,9 @@
 #define PROJ_HIT_SQ     (PROJ_HIT_PX * PROJ_HIT_PX)
 #define PROJ_DAMAGE      1
 
+/* Iter-6: frames between idle targeting rescans (no target found) */
+#define TOWER_IDLE_RESCAN 8
+
 /* Waves --------------------------------------------------------------- */
 #define MAX_WAVES        10
 #define INTER_WAVE_DELAY 180

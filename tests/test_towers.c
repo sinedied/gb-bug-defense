@@ -628,6 +628,92 @@ static void test_l2_render_tiles(void) {
     CHECK_EQ(s_bkg_tiles[5][5 + HUD_ROWS], TILE_TOWER_L2);
 }
 
+/* Iter-6: test_damage_idle_rescan — DAMAGE tower sets idle rescan
+ * cooldown when no target found. Asserts NO firing during the wait
+ * window and firing on the expected frame (TOWER_IDLE_RESCAN latency). */
+static void test_damage_idle_rescan(void) {
+    reset_all();
+    CHECK(towers_try_place(5, 5, TOWER_AV));
+    /* AV initial cooldown = 60. Drain to 0. */
+    for (int f = 0; f < 60; f++) towers_update();
+    /* Now cooldown=0. Tick once: scan, no target → cooldown set to idle floor. */
+    s_proj_fire_count = 0;
+    towers_update();
+    CHECK_EQ(s_proj_fire_count, 0);
+    /* Spawn enemy in range immediately after idle scan. */
+    place_enemy(0, 44, 52);  /* in range of AV at (44, 52) */
+    /* Assert: for each of next (TOWER_IDLE_RESCAN - 1) frames, NOT fired.
+     * Cooldown decrements from (TOWER_IDLE_RESCAN - 1) down to 0. */
+    for (int f = 0; f < TOWER_IDLE_RESCAN - 1; f++) {
+        towers_update();
+        CHECK_EQ(s_proj_fire_count, 0);
+    }
+    /* Assert: on frame TOWER_IDLE_RESCAN (the next call), projectile fires. */
+    towers_update();
+    CHECK(s_proj_fire_count > 0);
+}
+
+/* Iter-6: test_emp_idle_rescan — EMP tower sets idle rescan cooldown
+ * when no targets in range. Asserts NO stun during the wait window
+ * and enemy stunned on the expected frame (TOWER_IDLE_RESCAN latency). */
+static void test_emp_idle_rescan(void) {
+    reset_all();
+    CHECK(towers_try_place(5, 5, TOWER_EMP));
+    /* F3: fresh-place cooldown=1. Drain it. */
+    towers_update();  /* cooldown 1→0 */
+    /* Tick once: scan with no enemies → cooldown set to idle floor. */
+    s_stun_call_count = 0;
+    towers_update();
+    CHECK_EQ(s_stun_call_count, 0);  /* no enemies = no stun calls */
+    /* Spawn enemy in range immediately after idle scan. */
+    place_enemy(0, 44, 52);
+    /* Assert: for each of next (TOWER_IDLE_RESCAN - 1) frames, NOT stunned. */
+    for (int f = 0; f < TOWER_IDLE_RESCAN - 1; f++) {
+        towers_update();
+        CHECK_EQ(s_stun_call_count, 0);
+    }
+    /* Assert: on frame TOWER_IDLE_RESCAN, enemy stunned. */
+    s_stun_call_count = 0;
+    towers_update();
+    int found = 0;
+    for (int k = 0; k < s_stun_call_count; k++) {
+        if (s_stun_calls[k].result) found = 1;
+    }
+    CHECK(found);
+}
+
+/* Iter-6: test_multi_tower_idle_rescan — synchronized burst validation:
+ * multiple towers placed simultaneously share rescan timing. Asserts
+ * NO firing during the wait window and correct firing on expected frame. */
+static void test_multi_tower_idle_rescan(void) {
+    reset_all();
+    /* Place 4 AV towers. */
+    CHECK(towers_try_place(2, 2, TOWER_AV));
+    CHECK(towers_try_place(3, 2, TOWER_AV));
+    CHECK(towers_try_place(4, 2, TOWER_AV));
+    CHECK(towers_try_place(5, 2, TOWER_AV));
+    /* Drain all cooldowns to 0 (AV cooldown = 60). */
+    for (int f = 0; f < 60; f++) towers_update();
+    /* All 4 towers at cooldown=0. Next update: all scan empty range,
+     * all set cooldown = TOWER_IDLE_RESCAN - 1. */
+    s_proj_fire_count = 0;
+    towers_update();
+    CHECK_EQ(s_proj_fire_count, 0);
+    /* Place an enemy near tower at (5,2) — center (44, 28).
+     * AV range = 24px. Tower at (5,2) center = 5*8+4=44, (2+1)*8+4=28.
+     * Enemy at (44, 28) is distance 0 — in range of tower at (5,2). */
+    place_enemy(0, 44, 28);
+    /* Assert: for next (TOWER_IDLE_RESCAN - 1) frames, no fire.
+     * All towers cooling down in sync. */
+    for (int f = 0; f < TOWER_IDLE_RESCAN - 1; f++) {
+        towers_update();
+        CHECK_EQ(s_proj_fire_count, 0);
+    }
+    /* Assert: on frame TOWER_IDLE_RESCAN, tower at (5,2) finds enemy → fires. */
+    towers_update();
+    CHECK(s_proj_fire_count > 0);
+}
+
 int main(void) {
     test_emp_freshly_placed_cooldown_zero();
     test_emp_scan_all_in_range();
@@ -646,6 +732,9 @@ int main(void) {
     test_l2_emp_upgrade_preserves_cooldown();
     test_l2_tower_stats();
     test_l2_render_tiles();
+    test_damage_idle_rescan();
+    test_emp_idle_rescan();
+    test_multi_tower_idle_rescan();
 
     if (failures) {
         fprintf(stderr, "test_towers: %d failure(s)\n", failures);
