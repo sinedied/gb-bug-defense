@@ -8,9 +8,14 @@
 /* Iter-2 HUD layout (20 chars on row 0):
  *   0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
  *   H P : N _ E : N N N _  W  :  N  N  /  N  N  _  X
- * X = 'A' or 'F' (selected tower). */
+ * X = 'A' or 'F' (selected tower).
+ * Iter-4 #30: cols 18-19 are now managed by the s_dirty_t handler.
+ * When fast mode is on:  ">>" at cols 18-19.
+ * When fast mode is off: ' ' at col 18, tower letter at col 19.
+ * s_dirty_t always writes 2 tiles (cols 18-19). */
 
 static u8 s_dirty_hp, s_dirty_e, s_dirty_w, s_dirty_t;
+static bool s_hud_fast;   /* iter-4 #30: false after hud_init() */
 
 static void put_char(u8 x, u8 y, char c) {
     set_bkg_tile_xy(x, y, (u8)c);
@@ -41,8 +46,7 @@ void hud_init(void) {
     put_char(10, 0, ' ');
     put_char(11, 0, 'W'); put_char(12, 0, ':');
     put_char(15, 0, '/');
-    put_char(18, 0, ' ');
-
+    s_hud_fast = false;
     s_dirty_hp = s_dirty_e = s_dirty_w = s_dirty_t = 1;
     hud_update();
 }
@@ -51,6 +55,13 @@ void hud_mark_hp_dirty(void) { s_dirty_hp = 1; }
 void hud_mark_e_dirty(void)  { s_dirty_e  = 1; }
 void hud_mark_w_dirty(void)  { s_dirty_w  = 1; }
 void hud_mark_t_dirty(void)  { s_dirty_t  = 1; }
+
+void hud_set_fast_mode(bool on) {
+    if (s_hud_fast != on) {
+        s_hud_fast = on;
+        s_dirty_t = 1;
+    }
+}
 
 void hud_update(void) {
     if (s_dirty_hp) {
@@ -67,9 +78,15 @@ void hud_update(void) {
         s_dirty_w = 0;
     }
     if (s_dirty_t) {
-        u8 type = game_get_selected_tower_type();
-        const tower_stats_t *st = towers_stats(type);
-        put_char(19, 0, (char)st->hud_letter);
+        if (s_hud_fast) {
+            put_char(18, 0, '>');
+            put_char(19, 0, '>');
+        } else {
+            put_char(18, 0, ' ');
+            u8 type = game_get_selected_tower_type();
+            const tower_stats_t *st = towers_stats(type);
+            put_char(19, 0, (char)st->hud_letter);
+        }
         s_dirty_t = 0;
     }
 }

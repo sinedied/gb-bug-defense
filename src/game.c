@@ -41,6 +41,7 @@ static u8 s_gate_active;   /* 1 while waiting for first tower placement */
 static u8 s_gate_blink;    /* frame counter for blink timing (wrapping u8) */
 static u8 s_gate_vis;      /* last-painted blink phase: 1=text, 0=map tiles */
 static u8 s_gate_dirty;    /* 1 = need BG restore on gate-lift frame */
+static bool s_fast_mode;   /* iter-4 #30: 2× speed toggle */
 
 #define GATE_COL    7
 #define GATE_ROW1   8   /* screen row = PF row 7 + HUD_ROWS */
@@ -145,6 +146,7 @@ static void enter_playing(void) {
     projectiles_init();
     menu_init();
     pause_init();
+    s_fast_mode = false;   /* iter-4 #30: always start with normal speed */
     hud_init();
     /* Iter-4 #24: first-tower gate — paint text while display is off. */
     s_gate_active = 1;
@@ -195,6 +197,30 @@ static void cycle_tower_type(void) {
     hud_mark_t_dirty();
 }
 
+/* Iter-4 #30: entity-tick helper — runs towers, enemies, projectiles,
+ * and wave/gate-blink logic as a single atomic step.  Called once per
+ * frame at normal speed, twice when s_fast_mode is active.
+ * BG-write note: gate-lift frame + simultaneous SELECT can reach 18
+ * tiles (2 over the 16-tile VBlank cap) — accepted as a single-frame,
+ * once-per-session cosmetic edge case. */
+static void entity_tick(void) {
+    towers_update();
+    enemies_update();
+    projectiles_update();
+    if (s_gate_active) {
+        s_gate_blink++;
+        if (s_gate_blink >= 60) s_gate_blink = 0;
+    } else {
+        waves_update();
+    }
+    /* Consume wave-clear edge after each tick so a second entity_tick
+     * call cannot overwrite the one-shot flag. */
+    {
+        u8 cleared = waves_just_cleared_wave();
+        if (cleared) score_add_wave_clear(cleared);
+    }
+}
+
 static void playing_update(void) {
     /* Modal precedence: pause first, then upgrade/sell menu, then the
      * normal entity-tick path. game_is_modal_open() is the single
@@ -227,6 +253,12 @@ static void playing_update(void) {
         menu_update();
     } else {
         cursor_update();
+        /* Iter-4 #30: Speed toggle — SELECT edge.  Implicit modal gate:
+         * this code is unreachable when pause or menu is open. */
+        if (input_is_pressed(J_SELECT)) {
+            s_fast_mode = !s_fast_mode;
+            hud_set_fast_mode(s_fast_mode);
+        }
         if (!s_gate_active && input_is_pressed(J_B)) {
             cycle_tower_type();
         }
@@ -249,22 +281,8 @@ static void playing_update(void) {
                 }
             }
         }
-        towers_update();
-        enemies_update();
-        projectiles_update();
-        if (s_gate_active) {
-            s_gate_blink++;
-            if (s_gate_blink >= 60) s_gate_blink = 0;
-        } else {
-            waves_update();
-        }
-        /* Iter-3 #19: drain wave-clear edge into score. One-shot per
-         * cleared wave; runs only on the normal entity-update path so
-         * pause/menu modes can't fire it. */
-        {
-            u8 cleared = waves_just_cleared_wave();
-            if (cleared) score_add_wave_clear(cleared);
-        }
+        entity_tick();
+        if (s_fast_mode) entity_tick();
     }
     if (!s_gate_active) economy_tick();   /* runs even with menu open — D19 */
     audio_tick();     /* runs always so SFX continue during menu */
