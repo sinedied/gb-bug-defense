@@ -20,7 +20,7 @@ bool game_is_modal_open(void);
  * enter_playing(). Incremented once per game_update(). */
 u8   game_anim_frame(void);
 
-/* Iter-3 #20: difficulty (EASY / NORMAL / HARD). Persists across
+/* Iter-3 #20: difficulty (CASUAL / NORMAL / VETERAN). Persists across
  * enter_title()/enter_playing() within a power-on session; SRAM is
  * feature #19. Setter is a no-op for d >= DIFF_COUNT. */
 u8   game_difficulty(void);

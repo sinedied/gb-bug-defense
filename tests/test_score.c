@@ -55,9 +55,9 @@ static void t_wave_base(void) {
 
 static void t_apply_mult(void) {
     /* NORMAL: (base * 12) >> 3 = base * 1.5 */
-    CHECK_EQ(score_apply_mult(10, 8),  10);    /* EASY */
+    CHECK_EQ(score_apply_mult(10, 8),  10);    /* CASUAL */
     CHECK_EQ(score_apply_mult(10, 12), 15);    /* NORMAL */
-    CHECK_EQ(score_apply_mult(10, 16), 20);    /* HARD */
+    CHECK_EQ(score_apply_mult(10, 16), 20);    /* VETERAN */
     CHECK_EQ(score_apply_mult(100, 12), 150);
     CHECK_EQ(score_apply_mult(5000, 16), 10000);
     /* No int overflow in u16 path (uses u32 internally). */
@@ -77,9 +77,9 @@ static void t_add_clamped(void) {
 /* --- difficulty_calc.h extension --- */
 
 static void t_diff_mult_num(void) {
-    CHECK_EQ(difficulty_score_mult_num(DIFF_EASY),   8);
+    CHECK_EQ(difficulty_score_mult_num(DIFF_CASUAL),  8);
     CHECK_EQ(difficulty_score_mult_num(DIFF_NORMAL), 12);
-    CHECK_EQ(difficulty_score_mult_num(DIFF_HARD),   16);
+    CHECK_EQ(difficulty_score_mult_num(DIFF_VETERAN), 16);
     /* Garbage clamps to NORMAL. */
     CHECK_EQ(difficulty_score_mult_num(99), 12);
 }
@@ -103,12 +103,12 @@ static void t_score_add_kill_normal(void) {
 }
 
 static void t_score_add_kill_easy_hard(void) {
-    g_test_diff = DIFF_EASY;
+    g_test_diff = DIFF_CASUAL;
     score_reset();
     score_add_kill(0);  /* 10 * 8 / 8 = 10 */
     CHECK_EQ(score_get(), 10);
 
-    g_test_diff = DIFF_HARD;
+    g_test_diff = DIFF_VETERAN;
     score_reset();
     score_add_kill(0);  /* 10 * 16 / 8 = 20 */
     CHECK_EQ(score_get(), 20);
@@ -126,16 +126,16 @@ static void t_score_add_wave_clear(void) {
 }
 
 static void t_score_add_win_bonus(void) {
-    g_test_diff = DIFF_HARD;
+    g_test_diff = DIFF_VETERAN;
     score_reset();
     score_add_win_bonus();   /* 5000 * 16 / 8 = 10000 */
     CHECK_EQ(score_get(), 10000);
 }
 
 static void t_score_saturation(void) {
-    g_test_diff = DIFF_HARD;
+    g_test_diff = DIFF_VETERAN;
     score_reset();
-    /* HARD win bonus = 10 000. Add a few wins to overflow u16. */
+    /* VETERAN win bonus = 10 000. Add a few wins to overflow u16. */
     score_add_win_bonus();
     score_add_win_bonus();
     score_add_win_bonus();

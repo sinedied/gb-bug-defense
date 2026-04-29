@@ -20,7 +20,7 @@
  * VBlank window scheduled by main().
  *
  * Iter-3 #20 difficulty selector: BG-only `< LABEL >` at row 10 cols
- * 5..14 (10 tiles). Independent dirty flag so cycling does not disturb
+ * 5..15 (11 tiles). Independent dirty flag so cycling does not disturb
  * the PRESS-START blink path. Title screen owns NO game state — the
  * current selection comes from `game_difficulty()`; LEFT/RIGHT writes
  * back via `game_set_difficulty()`. Edge-only input (D9).
@@ -38,11 +38,11 @@
 
 #define DIFF_ROW   10
 #define DIFF_COL    5
-#define DIFF_W     10
+#define DIFF_W     11
 
 #define MAP_ROW    12
 #define MAP_COL     5
-#define MAP_W      10
+#define MAP_W      11
 
 #define FOCUS_COL   3
 
@@ -62,8 +62,8 @@ static u8   s_focus_dirty;
 static u8   s_hi_dirty;
 static u8   s_title_focus;     /* 0 = difficulty, 1 = map */
 static const char s_prompt[PROMPT_LEN + 1] = "PRESS START ";
-static const char *const s_diff_labels[3] = { " EASY ", "NORMAL", " HARD " };
-static const char *const s_map_labels[3]  = { "MAP 1 ", "MAP 2 ", "MAP 3 " };
+static const char *const s_diff_labels[3] = { "CASUAL ", "NORMAL ", "VETERAN" };
+static const char *const s_map_labels[3]  = { " MAP 1 ", " MAP 2 ", " MAP 3 " };
 
 static u8 focused_row(void) {
     return (s_title_focus == 0) ? DIFF_ROW : MAP_ROW;
@@ -80,16 +80,16 @@ static void draw_prompt_now(bool visible) {
     }
 }
 
-/* Layout: '<', ' ', label[0..5] (6 chars), ' ', '>'  -> 10 tiles. */
+/* Layout: '<', ' ', label[0..6] (7 chars), ' ', '>'  -> 11 tiles. */
 static void draw_selector(u8 col, u8 row, const char *label) {
     u8 i;
     set_bkg_tile_xy(col + 0, row, (u8)'<');
     set_bkg_tile_xy(col + 1, row, (u8)' ');
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 7; i++) {
         set_bkg_tile_xy(col + 2 + i, row, (u8)label[i]);
     }
-    set_bkg_tile_xy(col + 8, row, (u8)' ');
-    set_bkg_tile_xy(col + 9, row, (u8)'>');
+    set_bkg_tile_xy(col + 9, row, (u8)' ');
+    set_bkg_tile_xy(col + 10, row, (u8)'>');
 }
 
 static void draw_diff_now(void) {
@@ -196,7 +196,7 @@ void title_render(void) {
     /* VBlank BG-write budget is 16 writes/frame. Service ONE dirty
      * flag per frame in priority order, returning after each so the
      * worst-case write count is the heaviest single branch (12 for
-     * the prompt blink; 10 for either selector; 2 for focus). The
+     * the prompt blink; 11 for either selector; 2 for focus). The
      * blink is a 30-frame periodic toggle, so multi-frame slip is
      * invisible. (Iter-3 #20 selector-first, blink-deferred convention
      * extended to four flags.) */

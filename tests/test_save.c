@@ -124,8 +124,8 @@ static void t_save_init_valid(void) {
     g_sram[5] = 0;
     /* Zero the slot table, then plant known values in slots 0/4/8. */
     for (int i = 0; i < SAVE_HI_COUNT * 2; i++) g_sram[SAVE_OFF_HI + i] = 0;
-    /* slot 0 (M1/EASY) = 0x0001, slot 4 (M2/NORMAL) = 0x1234,
-     * slot 8 (M3/HARD) = 0xFFFF. */
+    /* slot 0 (M1/CASUAL) = 0x0001, slot 4 (M2/NORMAL) = 0x1234,
+     * slot 8 (M3/VETERAN) = 0xFFFF. */
     g_sram[SAVE_OFF_HI + 0]  = 0x01; g_sram[SAVE_OFF_HI + 1]  = 0x00;
     g_sram[SAVE_OFF_HI + 8]  = 0x34; g_sram[SAVE_OFF_HI + 9]  = 0x12;
     g_sram[SAVE_OFF_HI + 16] = 0xFF; g_sram[SAVE_OFF_HI + 17] = 0xFF;

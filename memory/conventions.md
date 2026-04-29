@@ -92,7 +92,7 @@ Predicates that decide modal precedence / cross-modal gating belong in a header-
   via `game_difficulty()`. Do NOT reset it in `enter_title()` or
   `enter_playing()`. SRAM persistence is feature #19 (separate spec).
 - **Difficulty enum lives in `src/difficulty_calc.h`** (NOT `game.h`):
-  `enum { DIFF_EASY=0, DIFF_NORMAL=1, DIFF_HARD=2, DIFF_COUNT=3 };`. `game.h`
+  `enum { DIFF_CASUAL=0, DIFF_NORMAL=1, DIFF_VETERAN=2, DIFF_COUNT=3 };`. `game.h`
   `#include`s `difficulty_calc.h` so on-device callers see the enum
   transitively, and host tests can include `difficulty_calc.h` directly
   without pulling `gtypes.h` / `<gb/gb.h>`. Use the symbolic names; the

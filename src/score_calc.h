@@ -32,7 +32,7 @@ static inline uint16_t score_wave_base(uint8_t wave_num) {
 }
 
 /* Difficulty multiplier: result = (base * mult_num) >> 3
- * where mult_num ∈ {EASY=8, NORMAL=12, HARD=16}. */
+ * where mult_num ∈ {CASUAL=8, NORMAL=12, VETERAN=16}. */
 static inline uint16_t score_apply_mult(uint16_t base, uint8_t mult_num) {
     return (uint16_t)(((uint32_t)base * (uint32_t)mult_num) >> 3);
 }

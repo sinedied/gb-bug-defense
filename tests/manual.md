@@ -312,7 +312,7 @@ press START, and walk through the scenarios below. Each maps to one of
     update ordering plus PPU/audio timing make this a manual-only
     check. 
 
-## Iter-3 # Difficulty modes (EASY / NORMAL / HARD)20 
+## Iter-3 # Difficulty modes (CASUAL / NORMAL / VETERAN)20 
 
 Setup: `just build && just run`. mGBA controls: arrows = D-pad,
 `Z` = A, `X` = B, `Enter` = START.
@@ -320,21 +320,21 @@ Setup: `just build && just run`. mGBA controls: arrows = D-pad,
 | #  | Scenario                            | Steps                                                                                                                | Expected                                                                                                |
 |----|-------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
 | D1 | Default on cold boot                | Power on → title.                                                                                                    | Selector shows `< NORMAL >` centered on row 10. PRESS START blinks below.                               |
-| D2 | Cycle right with wrap               | RIGHT, RIGHT, RIGHT.                                                                                                 | After 1st `< HARD >`; after 2nd wraps to `< EASY >`; after 3rd `< NORMAL >`.                            |
-| D3 | Cycle left with wrap                | From default NORMAL: LEFT, LEFT, LEFT.                                                                               | After 1st `< EASY >`; after 2nd wraps to `< HARD >`; after 3rd `< NORMAL >`.                            |
+| D2 | Cycle right with wrap               | RIGHT, RIGHT, RIGHT.                                                                                                 | After 1st `< VETERAN >`; after 2nd wraps to `< CASUAL  >`; after 3rd `< NORMAL  >`.                     |
+| D3 | Cycle left with wrap                | From default NORMAL: LEFT, LEFT, LEFT.                                                                               | After 1st `< CASUAL  >`; after 2nd wraps to `< VETERAN >`; after 3rd `< NORMAL  >`.                     |
 | D4 | A / B inert on title                | Press A; press B.                                                                                                    | No visual change; selector stays put; no state transition.                                              |
-| D5 | START commits — starting energy     | Set EASY → press START.                                                                                              | Game enters PLAYING. HUD shows `E:045` immediately.                                                     |
-| D6 | HARD spawn faster + lower wallet    | Title → HARD → START → wait through W1 grace, place 1 antivirus on a path-adjacent tile, then watch W1 spawns.       | HUD `E:024` right after START. Inter-spawn gap visibly tighter than NORMAL (~38 f vs 50 f over 5 bugs). |
-| D7 | EASY HUD energy                     | Title → EASY → START.                                                                                                | HUD `E:045` immediately after START.                                                                    |
-| D8 | Quit-to-title preserves selection   | Title → HARD → START → pause → QUIT → back at title.                                                                 | Selector still `< HARD >` (not reset to NORMAL).                                                        |
-| D9 | Game-over preserves selection       | Title → EASY → START → lose deliberately → press START on lose screen.                                               | Back at title; selector still `< EASY >`.                                                               |
+| D5 | START commits — starting energy     | Set CASUAL → press START.                                                                                            | Game enters PLAYING. HUD shows `E:045` immediately.                                                     |
+| D6 | VETERAN spawn faster + lower wallet | Title → VETERAN → START → wait through W1 grace, place 1 antivirus on a path-adjacent tile, then watch W1 spawns.    | HUD `E:028` right after START. Inter-spawn gap visibly tighter than NORMAL (~38 f vs 50 f over 5 bugs). |
+| D7 | CASUAL HUD energy                   | Title → CASUAL → START.                                                                                              | HUD `E:045` immediately after START.                                                                    |
+| D8 | Quit-to-title preserves selection   | Title → VETERAN → START → pause → QUIT → back at title.                                                              | Selector still `< VETERAN >` (not reset to NORMAL).                                                     |
+| D9 | Game-over preserves selection       | Title → CASUAL → START → lose deliberately → press START on lose screen.                                             | Back at title; selector still `< CASUAL  >`.                                                            |
 | D10| Win-over preserves selection        | Title → NORMAL → win all 10 waves → press START on win screen.                                                       | Back at title; selector still `< NORMAL >`.                                                             |
 | D11| Power-off resets                    | Power off mGBA, power on.                                                                                            | Selector defaults to `< NORMAL >` (no SRAM).                                                            |
 | D12| Pause works on every difficulty     | Repeat D5 / D6 / D7 with one pause+resume during gameplay.                                                           | Pause modal opens/closes identically. No SFX or visual difference between modes.                        |
-| D13| Visual / audio parity               | Compare W1 on EASY vs HARD.                                                                                          | Same bug sprites, same audio cues, same HUD layout. Only HP, spawn timing, and starting `E:` differ.    |
-| D14| EASY beatable, HARD beatable        | Play through all 10 waves on EASY (casual) and HARD (focused).                                                       | Both runs reach the WIN screen.                                                                         |
+| D13| Visual / audio parity               | Compare W1 on CASUAL vs VETERAN.                                                                                     | Same bug sprites, same audio cues, same HUD layout. Only HP, spawn timing, and starting `E:` differ.    |
+| D14| CASUAL beatable, VETERAN beatable   | Play through all 10 waves on CASUAL (casual) and VETERAN (focused).                                                  | Both runs reach the WIN screen.                                                                         |
 
-**Note on HARD late waves**: by design, HARD wave 10's scaled spawn delay
+**Note on VETERAN late waves**: by design, VETERAN wave 10's scaled spawn delay
  37 frames) outpaces path traversal so the `MAX_ENEMIES = 14` pool
 saturates. `waves.c` falls back to retry every 8 frames (existing iter-2
 back-pressure). Expected, not a regression.
@@ -353,7 +353,7 @@ a single early `return;`).
 **Manual on-device check (mGBA / real DMG):**
 1. Boot to title; selector reads `< NORMAL >`, PRESS START blinks.
 2. Hold LEFT for ~2 s, then release. While held, the selector cycles
-   continuously through EASY/HARD/NORMAL.
+   continuously through CASUAL/VETERAN/NORMAL.
 3. Repeat with RIGHT held for ~2 s.
 4. Pass = the difficulty selector row (row 10, cols 5..14) AND the
    PRESS START prompt row (row 13, cols 4..15) remain pristine — no
@@ -501,10 +501,10 @@ DMG / mGBA). Run them after any change to `src/music.c` or
    heavier sprite, slower walk).
 
 ### Scenario 10: Armored HP scaling
-1. For each difficulty in {EASY, NORMAL, HARD}: restart, place
+1. For each difficulty in {CASUAL, NORMAL, VETERAN}: restart, place
    **exactly one AV-L0** at a position where it is the only tower in
    range of the armored bug's path; play to W7; count shots to kill.
-2. **Expected**: EASY: 8 shots. NORMAL: 12 shots. HARD: 16 shots.
+2. **Expected**: CASUAL: 6 shots. NORMAL: 12 shots. VETERAN: 14 shots.
 
 ### Scenario 11: Flash > stun visual
 1. Continuation of scenario 4 (≥1 stunned enemy on screen). While
@@ -558,7 +558,7 @@ DMG / mGBA). Run them after any change to `src/music.c` or
 
 ### Scenario 19: LEFT/RIGHT routes by focus
 1. From cold-boot title (focus=difficulty), press RIGHT.
-2. **Expected**: Difficulty becomes `< HARD >`. Map row unchanged.
+2. **Expected**: Difficulty becomes `< VETERAN >`. Map row unchanged.
 3. Press DOWN to move focus to map row, then press RIGHT.
 4. **Expected**: Map becomes `< MAP 2 >`. Difficulty row unchanged.
 
@@ -575,7 +575,7 @@ DMG / mGBA). Run them after any change to `src/music.c` or
    for iter-3 #20 D6).
 
 ### Scenario 22: Power-on resets selection
-1. Set difficulty=HARD, map=MAP 3, START a session, then power-cycle
+1. Set difficulty=VETERAN, map=MAP 3, START a session, then power-cycle
    the emulator (close + relaunch).
 2. **Expected**: Title shows `< NORMAL >`, `< MAP 1 >` (cold-boot
    defaults; SRAM persistence is feature #19, not yet shipped).
@@ -620,14 +620,14 @@ DMG / mGBA). Run them after any change to `src/music.c` or
    little-endian high scores). Verify with `xxd build/bugdefender.sav | head -2`.
 
 ### Scenario 29: Power-cycle persistence (iter-3 #19)
-1. Cycle title to Map 2 / HARD. Press START. Achieve any score (e.g.
+1. Cycle title to Map 2 / VETERAN. Press START. Achieve any score (e.g.
    let one wave complete) and let HP fall to 0 to reach gameover.
-   Press START to return to title. The `HI:` line for Map 2 / HARD
+   Press START to return to title. The `HI:` line for Map 2 / VETERAN
    should show the new score.
 2. Quit mGBA. Reopen `mgba build/bugdefender.gb` (without deleting the
    `.sav`).
 3. **Expected**: title selectors snap back to defaults (Map 1 /
-   NORMAL — RAM-only state), but cycling to Map 2 / HARD on the title
+   NORMAL — RAM-only state), but cycling to Map 2 / VETERAN on the title
    shows the persisted score from the previous run. mGBA writes/loads
    the `.sav` automatically.
 
@@ -646,12 +646,12 @@ DMG / mGBA). Run them after any change to `src/music.c` or
    is `score > prior_hi` regardless of win/lose state.
 
 ### Scenario 31: Per-(map, difficulty) high-score isolation (iter-3 #19)
-1. Set a non-zero HI on Map 3 / HARD (play a brief run; gameover
+1. Set a non-zero HI on Map 3 / VETERAN (play a brief run; gameover
    commits the score).
-2. Cycle title selectors to Map 1 / EASY.
+2. Cycle title selectors to Map 1 / CASUAL.
 3. **Expected**: `HI:` line shows `00000` (or whatever value Map 1 /
-   EASY previously held). Each of the 9 (map, difficulty) slots is
-   independent; cycling back to Map 3 / HARD restores the saved value
+   CASUAL previously held). Each of the 9 (map, difficulty) slots is
+   independent; cycling back to Map 3 / VETERAN restores the saved value
    within one frame (BG-write priority chain services `s_hi_dirty`
    after the selector flag).
 

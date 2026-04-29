@@ -211,6 +211,13 @@
 - **Rationale**: Avoids touching `audio.c` and adding a new ordering test in `test_audio.c`. Pause is a short-duration UX; silent transition matches the iter-2 modal style.
 - **Alternatives**: Add `SFX_PAUSE_OPEN`/`SFX_PAUSE_CLOSE` (deferred — minimal-audio bias).
 
+### Iter-4 #23: Difficulty tier rename (Easy→Casual, Hard→Veteran) and selector widen
+- **Date**: 2025-07-21
+- **Context**: Feature #23 renames difficulty tiers and rebalances HP/spawn/energy. "VETERAN" is 7 chars but the title-screen selector only rendered 6-char labels.
+- **Decision**: Widen `draw_selector` from 6-char labels (10 tiles) to 7-char labels (11 tiles). All label strings (difficulty and map) become 7 chars. `DIFF_W` and `MAP_W` change from 10 to 11. Enum symbols renamed: `DIFF_EASY`→`DIFF_CASUAL`, `DIFF_HARD`→`DIFF_VETERAN`; integer values 0/1/2 preserved.
+- **Rationale**: 11 writes/frame for selector render is still under the 12-write worst case (prompt blink) and well within the 16-write VBlank cap. Abbreviating "VETERAN" to 6 chars would require misspelling or unclear abbreviation. Screen fits (col 5 + 11 = col 15, within 20-col width).
+- **Alternatives**: Abbreviate to 6 chars (rejected — ugly/confusing); add `#define` aliases instead of rename (rejected — old names shouldn't persist).
+
 ### Modal-precedence helper extracted to `src/game_modal.h`
 - **Date**: 2026-05-02
 - **Context**: F1  `playing_update()` ran `menu_update()` then fell through to the END-of-frame START handler. Same-frame "A/B closes upgrade menu + START pressed" passed `!menu_is_open()` (just closed) and unintentionally opened pause. The bug went undetected because all pause tests linked only `src/pause.c` in isolation; modal dispatch in `playing_update()` had no host-level coverage.regression 
