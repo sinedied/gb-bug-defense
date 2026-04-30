@@ -18,6 +18,7 @@ typedef struct {
                     * detect their target slot was reused by a different bug */
     u8 flash_timer;/* iter-3 #21: frames remaining in hit-flash override */
     u8 stun_timer; /* iter-3 #18: frames remaining in stun (0 = not stunned) */
+    u8 is_boss;    /* iter-7: 0=normal, 1=boss */
 } enemy_t;
 
 typedef struct {
@@ -35,6 +36,12 @@ static const enemy_stats_t s_enemy_stats[ENEMY_TYPE_COUNT] = {
 };
 
 static enemy_t s_enemies[MAX_ENEMIES];
+
+/* Iter-7: boss-specific state. At most 1 boss alive at a time. */
+static fix8 s_boss_speed;
+static u8   s_boss_bounty;
+static u8   s_boss_max_hp;
+static u8   s_boss_bar_thr[3]; /* 75%, 50%, 25% thresholds */
 
 static fix8 wp_x_fix(i8 tx) {
     /* tx may be negative (-1 = off-screen spawn). */
@@ -54,8 +61,10 @@ void enemies_init(void) {
         s_enemies[i].type = ENEMY_BUG;
         s_enemies[i].flash_timer = 0;
         s_enemies[i].stun_timer = 0;
+        s_enemies[i].is_boss = 0;
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
     }
+    move_sprite(OAM_BOSS_BAR, 0, 0);
 }
 
 void enemies_hide_all(void) {
@@ -63,9 +72,10 @@ void enemies_hide_all(void) {
     for (i = 0; i < MAX_ENEMIES; i++) {
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
     }
+    move_sprite(OAM_BOSS_BAR, 0, 0);
 }
 
-bool enemies_spawn(u8 type) {
+bool enemies_spawn(u8 type, u8 wave_1based) {
     u8 i;
     if (type >= ENEMY_TYPE_COUNT) return false;
     for (i = 0; i < MAX_ENEMIES; i++) {
@@ -73,14 +83,51 @@ bool enemies_spawn(u8 type) {
         const waypoint_t *wp = map_waypoints();
         s_enemies[i].x = wp_x_fix(wp[0].tx);
         s_enemies[i].y = wp_y_fix(wp[0].ty);
-        s_enemies[i].hp = difficulty_enemy_hp(type, game_difficulty());
+        s_enemies[i].hp = difficulty_wave_enemy_hp(type, game_difficulty(), wave_1based);
         s_enemies[i].wp_idx = 0;
         s_enemies[i].anim = 0;
         s_enemies[i].alive = 1;
         s_enemies[i].type = type;
         s_enemies[i].flash_timer = 0;
         s_enemies[i].stun_timer = 0;
+        s_enemies[i].is_boss = 0;
         s_enemies[i].gen++;   /* wraps at 255; collision is astronomical */
+        return true;
+    }
+    return false;
+}
+
+bool enemies_spawn_boss(u8 wave_1based) {
+    u8 i;
+    /* Guard: at most 1 boss alive at a time. */
+    for (i = 0; i < MAX_ENEMIES; i++) {
+        if (s_enemies[i].alive && s_enemies[i].is_boss) return false;
+    }
+    /* Find a free slot. */
+    for (i = 0; i < MAX_ENEMIES; i++) {
+        if (s_enemies[i].alive) continue;
+        /* Full regular-spawn init block (identical to non-boss path). */
+        const waypoint_t *wp = map_waypoints();
+        s_enemies[i].x = wp_x_fix(wp[0].tx);
+        s_enemies[i].y = wp_y_fix(wp[0].ty);
+        s_enemies[i].wp_idx = 0;
+        s_enemies[i].anim = 0;
+        s_enemies[i].alive = 1;
+        s_enemies[i].type = ENEMY_BUG;  /* unused for boss logic */
+        s_enemies[i].flash_timer = 0;
+        s_enemies[i].stun_timer = 0;
+        s_enemies[i].gen++;
+        /* Boss-specific overrides. */
+        s_enemies[i].is_boss = 1;
+        s_enemies[i].hp = difficulty_boss_hp(wave_1based, game_difficulty());
+        s_boss_speed = BOSS_SPEED;
+        s_boss_bounty = (wave_1based >= 10) ? BOSS_BOUNTY_W10 : BOSS_BOUNTY_W5;
+        s_boss_max_hp = s_enemies[i].hp;
+        s_boss_bar_thr[0] = (u8)(s_boss_max_hp * 3u / 4u);
+        s_boss_bar_thr[1] = (u8)(s_boss_max_hp / 2u);
+        s_boss_bar_thr[2] = (u8)(s_boss_max_hp / 4u);
+        /* Set HP bar tile only; position is set by step_enemy next frame. */
+        set_sprite_tile(OAM_BOSS_BAR, SPR_BOSS_BAR_4);
         return true;
     }
     return false;
@@ -97,8 +144,12 @@ u8   enemies_x_px(u8 idx)     { return FIX8_INTU(s_enemies[idx].x); }
 u8   enemies_y_px(u8 idx)     { return FIX8_INTU(s_enemies[idx].y); }
 u8   enemies_wp_idx(u8 idx)   { return s_enemies[idx].wp_idx; }
 u8   enemies_gen(u8 idx)      { return s_enemies[idx].gen; }
-u8   enemies_bounty(u8 idx)   { return s_enemy_stats[s_enemies[idx].type].bounty; }
+u8   enemies_bounty(u8 idx)   {
+    if (s_enemies[idx].is_boss) return s_boss_bounty;
+    return s_enemy_stats[s_enemies[idx].type].bounty;
+}
 u8   enemies_type(u8 idx)     { return s_enemies[idx].type; }
+bool enemies_is_boss(u8 idx)  { return s_enemies[idx].is_boss ? true : false; }
 
 void enemies_set_flash(u8 idx) {
     if (idx >= MAX_ENEMIES) return;
@@ -111,7 +162,9 @@ void enemies_set_flash(u8 idx) {
      * same frame the hit lands. */
     {
         u8 tile;
-        if (s_enemies[idx].type == ENEMY_BUG)
+        if (s_enemies[idx].is_boss)
+            tile = SPR_BOSS_FLASH;
+        else if (s_enemies[idx].type == ENEMY_BUG)
             tile = SPR_BUG_FLASH;
         else if (s_enemies[idx].type == ENEMY_ROBOT)
             tile = SPR_ROBOT_FLASH;
@@ -135,15 +188,32 @@ bool enemies_is_stunned(u8 idx) {
     return s_enemies[idx].stun_timer != 0;
 }
 
+/* Iter-7: update boss HP bar tile based on current HP vs thresholds. */
+static void boss_update_bar(u8 hp) {
+    u8 tile;
+    if (hp > s_boss_bar_thr[0])      tile = SPR_BOSS_BAR_4;
+    else if (hp > s_boss_bar_thr[1]) tile = SPR_BOSS_BAR_3;
+    else if (hp > s_boss_bar_thr[2]) tile = SPR_BOSS_BAR_2;
+    else                              tile = SPR_BOSS_BAR_1;
+    set_sprite_tile(OAM_BOSS_BAR, tile);
+}
+
 bool enemies_apply_damage(u8 idx, u8 dmg) {
     if (!s_enemies[idx].alive) return false;
     if (s_enemies[idx].hp <= dmg) {
         s_enemies[idx].hp = 0;
         s_enemies[idx].alive = 0;
         move_sprite(OAM_ENEMIES_BASE + idx, 0, 0);
+        if (s_enemies[idx].is_boss) {
+            move_sprite(OAM_BOSS_BAR, 0, 0);
+            s_enemies[idx].is_boss = 0;
+        }
         return true;
     }
     s_enemies[idx].hp -= dmg;
+    if (s_enemies[idx].is_boss) {
+        boss_update_bar(s_enemies[idx].hp);
+    }
     return false;
 }
 
@@ -158,9 +228,13 @@ static void step_enemy(u8 i) {
     u8 nxt = e->wp_idx + 1;
     if (nxt >= wp_n) {
         /* Reached computer: damage + despawn. */
-        economy_damage(1);
+        economy_damage(e->is_boss ? BOSS_LEAK_DAMAGE : 1);
         e->alive = 0;
         move_sprite(OAM_ENEMIES_BASE + i, 0, 0);
+        if (e->is_boss) {
+            move_sprite(OAM_BOSS_BAR, 0, 0);
+            e->is_boss = 0;
+        }
         return;
     }
 
@@ -172,7 +246,7 @@ static void step_enemy(u8 i) {
         /* Path is axis-aligned; move along the dominant axis. */
         i16 ddx = tx - e->x;
         i16 ddy = ty - e->y;
-        fix8 step = s_enemy_stats[e->type].speed;
+        fix8 step = e->is_boss ? s_boss_speed : s_enemy_stats[e->type].speed;
 
         if (ddx > 0) {
             if (ddx <= step) { e->x = tx; }
@@ -202,34 +276,47 @@ static void step_enemy(u8 i) {
     u8 had_flash = enemies_flash_step(&e->flash_timer);
     if (e->stun_timer) e->stun_timer--;  /* always tick, independent of flash */
     u8 tile;
-    if (had_flash) {
-        /* Priority 1: flash (3-frame hit feedback). */
-        if (e->type == ENEMY_BUG)
-            tile = SPR_BUG_FLASH;
-        else if (e->type == ENEMY_ROBOT)
-            tile = SPR_ROBOT_FLASH;
-        else
-            tile = SPR_ARMORED_FLASH;
-    } else if (was_stunned) {
-        /* Priority 2: stun (frozen visual). Uses pre-dec snapshot so the
-         * stun tile shows for the full duration. */
-        if (e->type == ENEMY_BUG)
-            tile = SPR_BUG_STUN;
-        else if (e->type == ENEMY_ROBOT)
-            tile = SPR_ROBOT_STUN;
-        else
-            tile = SPR_ARMORED_STUN;
+    if (e->is_boss) {
+        if (had_flash) tile = SPR_BOSS_FLASH;
+        else if (was_stunned) tile = SPR_BOSS_STUN;
+        else {
+            e->anim++;
+            tile = ((e->anim >> 4) & 1) ? SPR_BOSS_B : SPR_BOSS_A;
+        }
     } else {
-        /* Priority 3: normal walk animation. */
-        e->anim++;
-        u8 frame = (e->anim >> 4) & 1;
-        tile = frame ? s_enemy_stats[e->type].spr_b : s_enemy_stats[e->type].spr_a;
+        if (had_flash) {
+            /* Priority 1: flash (3-frame hit feedback). */
+            if (e->type == ENEMY_BUG)
+                tile = SPR_BUG_FLASH;
+            else if (e->type == ENEMY_ROBOT)
+                tile = SPR_ROBOT_FLASH;
+            else
+                tile = SPR_ARMORED_FLASH;
+        } else if (was_stunned) {
+            /* Priority 2: stun (frozen visual). Uses pre-dec snapshot so the
+             * stun tile shows for the full duration. */
+            if (e->type == ENEMY_BUG)
+                tile = SPR_BUG_STUN;
+            else if (e->type == ENEMY_ROBOT)
+                tile = SPR_ROBOT_STUN;
+            else
+                tile = SPR_ARMORED_STUN;
+        } else {
+            /* Priority 3: normal walk animation. */
+            e->anim++;
+            u8 frame = (e->anim >> 4) & 1;
+            tile = frame ? s_enemy_stats[e->type].spr_b : s_enemy_stats[e->type].spr_a;
+        }
     }
     set_sprite_tile(OAM_ENEMIES_BASE + i, tile);
     /* GB sprite origin: pixel center -> -4 to align top-left of 8x8 tile. */
     u8 sx = FIX8_INTU(e->x) - 4 + 8;
     u8 sy = FIX8_INTU(e->y) - 4 + 16;
     move_sprite(OAM_ENEMIES_BASE + i, sx, sy);
+    /* Iter-7: boss HP bar tracks 8px above the boss sprite. */
+    if (e->is_boss) {
+        move_sprite(OAM_BOSS_BAR, sx, sy - 8);
+    }
 }
 
 void enemies_update(void) {

@@ -12,7 +12,7 @@
 #error "MAP_SELECT_COUNT must equal MAP_COUNT - update src/map_select.h"
 #endif
 
-/* "PRESS START" prompt blink: toggle row 13 cols 4..15 (12 tiles) every
+/* "PRESS START" prompt blink: toggle row 14 cols 4..15 (12 tiles) every
  * 30 frames between glyph indices and blank (tile 32 = space).
  *
  * Render/update split: title_update() only mutates state and flips a
@@ -32,7 +32,7 @@
  * priority `s_diff_dirty > s_map_dirty > s_focus_dirty > s_dirty`.
  * Worst case is 12 BG writes/frame (≤ 16 cap). */
 
-#define PROMPT_ROW 13
+#define PROMPT_ROW 14
 #define PROMPT_COL  4
 #define PROMPT_LEN 12
 
@@ -46,10 +46,10 @@
 
 #define FOCUS_COL   5
 
-/* Iter-3 #19: HI line at row 15 cols 5..13 (9 tiles). Static, recomputed
+/* Iter-3 #19: HI line at row 16 cols 5..13 (9 tiles). Static, recomputed
  * when difficulty or map cycles. Inserted in the priority chain
  * AFTER s_focus_dirty, BEFORE s_dirty (prompt blink). 9 writes/frame. */
-#define HI_ROW     15
+#define HI_ROW     16
 #define HI_COL      5
 #define HI_W        9
 
@@ -103,7 +103,7 @@ static void draw_focus_now(void) {
     set_bkg_tile_xy(FOCUS_COL, focused_row(),   (u8)TILE_ARROW);
 }
 
-/* Iter-3 #19: paint `HI: NNNNN` at row 15 cols 5..13. 9 writes total.
+/* Iter-3 #19: paint `HI: NNNNN` at row 16 cols 5..13. 9 writes total.
  * Re-reads from save.c on each call; no local cache (single-owner
  * convention — high-score cache lives only in save.c). */
 static void draw_hi_now(void) {

@@ -226,3 +226,12 @@ Direct enemy_t access from outside enemies.c is forbidden.
 - **Mood via fill tiles**: Dark/light mood is achieved by filling decorative rows with dark-toned tiles (STATIC on lose) vs leaving them as white space (win). This preserves font legibility on all rows that contain text.
 - **Reserved score rows**: gameover.c code-draws at rows 13–15. Both end-screen tilemaps MUST have all-space (tile 32) at those entire rows. Art composition lives above row 12 with row 12 blank as breathing room.
 - **Tile naming for end-screen art**: `ENDSCR_*` prefix distinguishes from `TITLE_*` tiles. Python idx constants follow the `*_IDX = MAP_TILE_BASE + N` pattern.
+
+### Iter-7 conventions (difficulty scaling, boss enemies, title spacing)
+- **OAM allocation (iter-7 update)**: OAM slot 39 (`OAM_BOSS_BAR`) is now claimed by the boss HP bar sprite. Was previously reserved-unused. `enemies_init()` and `enemies_hide_all()` both hide it. Full map: `0 = cursor, 1..16 = menu/pause, 17..30 = enemies (14), 31..38 = projectiles (8), 39 = boss HP bar`.
+ 51 tiles (8 new boss tiles: walk A/B, flash, stun, HP bar 4). 256 max. Ample headroom.
+- **`enemies_spawn` API (iter-7)**: Takes `(u8 type, u8 wave_1based)`. All callers (waves.c production + test_enemies.c test stubs) pass the 1-based wave number. Test calls use `wave_1based=1` (identity scaling).
+- **Boss is a flag, not a type**: `enemy_t.is_boss` flag on existing pool slot. Module-level statics (`s_boss_speed`, `s_boss_bounty`, `s_boss_max_hp`, `s_boss_bar_thr[3]`) hold boss-specific config. At most 1 boss alive at a time (guard in `enemies_spawn_boss`).
+- **SPAWN_BOSS sentinel**: Defined as `0xFF` in `waves.c` (local scope). Wave script encodes boss spawns as `{SPAWN_BOSS, delay}` events appended to W5 and W10. `waves_update` branches on the sentinel to call `enemies_spawn_boss()`.
+- **Boss bounty capture**: `enemies_is_boss()` must be captured BEFORE `enemies_apply_damage()` in projectiles.c, same as the existing bounty/type capture convention.
+- **Per-wave HP scaling**: `WAVE_HP_SCALE[10]` in `difficulty_calc.h`. Multiplier  base HP (numerator/8). Wave 2 = identity (11.0). Wave 10 = 3.0.

@@ -113,7 +113,15 @@
 #define SPR_BUG_STUN      40
 #define SPR_ROBOT_STUN    41
 #define SPR_ARMORED_STUN  42
-#define SPRITE_TILE_COUNT 43
+#define SPR_BOSS_A        43
+#define SPR_BOSS_B        44
+#define SPR_BOSS_FLASH    45
+#define SPR_BOSS_STUN     46
+#define SPR_BOSS_BAR_1    47
+#define SPR_BOSS_BAR_2    48
+#define SPR_BOSS_BAR_3    49
+#define SPR_BOSS_BAR_4    50
+#define SPRITE_TILE_COUNT 51
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

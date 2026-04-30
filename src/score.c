@@ -20,6 +20,10 @@ void score_add_kill(u8 enemy_type) {
     add_scaled(score_kill_base(enemy_type));
 }
 
+void score_add_boss_kill(void) {
+    add_scaled(SCORE_KILL_BOSS);
+}
+
 void score_add_wave_clear(u8 wave_num) {
     add_scaled(score_wave_base(wave_num));
 }

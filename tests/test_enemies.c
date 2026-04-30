@@ -89,7 +89,7 @@ static void reset_all(void) {
 /* T1: enemies_try_stun returns true on fresh enemy, false on already stunned. */
 static void test_try_stun_basic(void) {
     reset_all();
-    enemies_spawn(ENEMY_BUG);
+    enemies_spawn(ENEMY_BUG, 1);
     CHECK(enemies_alive(0));
     CHECK(!enemies_is_stunned(0));
 
@@ -105,7 +105,7 @@ static void test_try_stun_basic(void) {
 /* T2: enemies_try_stun returns false on dead enemy. */
 static void test_try_stun_dead(void) {
     reset_all();
-    enemies_spawn(ENEMY_BUG);
+    enemies_spawn(ENEMY_BUG, 1);
     /* Kill it. */
     enemies_apply_damage(0, 255);
     CHECK(!enemies_alive(0));
@@ -122,7 +122,7 @@ static void test_try_stun_oob(void) {
 /* T4: stun_timer counts down to 0 via enemies_update. */
 static void test_stun_timer_decrement(void) {
     reset_all();
-    enemies_spawn(ENEMY_BUG);
+    enemies_spawn(ENEMY_BUG, 1);
     enemies_try_stun(0, 5);
     CHECK(enemies_is_stunned(0));
 
@@ -139,7 +139,7 @@ static void test_stun_timer_decrement(void) {
 /* T5: movement is frozen while stunned, resumes after. */
 static void test_stun_freezes_movement(void) {
     reset_all();
-    enemies_spawn(ENEMY_BUG);
+    enemies_spawn(ENEMY_BUG, 1);
     /* Record initial position. */
     u8 x0 = enemies_x_px(0);
     u8 y0 = enemies_y_px(0);
@@ -168,7 +168,7 @@ static void test_stun_freezes_movement(void) {
 /* T6: flash > stun priority — flash tile shows even when stunned. */
 static void test_flash_over_stun(void) {
     reset_all();
-    enemies_spawn(ENEMY_BUG);
+    enemies_spawn(ENEMY_BUG, 1);
 
     /* Stun the enemy. */
     enemies_try_stun(0, 60);
@@ -200,7 +200,7 @@ static void test_flash_over_stun(void) {
 /* T7: armored enemy spawns, walks, takes damage with flash. */
 static void test_armored_basic(void) {
     reset_all();
-    CHECK(enemies_spawn(ENEMY_ARMORED));
+    CHECK(enemies_spawn(ENEMY_ARMORED, 1));
     CHECK(enemies_alive(0));
     CHECK_EQ(enemies_bounty(0), ARMORED_BOUNTY);
 
@@ -212,9 +212,9 @@ static void test_armored_basic(void) {
 /* T8: is_stunned reads back correctly for all enemy types. */
 static void test_is_stunned_all_types(void) {
     reset_all();
-    enemies_spawn(ENEMY_BUG);
-    enemies_spawn(ENEMY_ROBOT);
-    enemies_spawn(ENEMY_ARMORED);
+    enemies_spawn(ENEMY_BUG, 1);
+    enemies_spawn(ENEMY_ROBOT, 1);
+    enemies_spawn(ENEMY_ARMORED, 1);
 
     CHECK(!enemies_is_stunned(0));
     CHECK(!enemies_is_stunned(1));

@@ -146,6 +146,32 @@ static void t_score_saturation(void) {
     CHECK_EQ(score_get(), 0xFFFF);
 }
 
+/* Iter-7: boss kill score */
+static void t_score_kill_boss_constant(void) {
+    CHECK_EQ(SCORE_KILL_BOSS, 300u);
+}
+
+static void t_score_add_boss_kill_normal(void) {
+    g_test_diff = DIFF_NORMAL;
+    score_reset();
+    score_add_boss_kill();  /* 300 * 12 / 8 = 450 */
+    CHECK_EQ(score_get(), 450);
+}
+
+static void t_score_add_boss_kill_veteran(void) {
+    g_test_diff = DIFF_VETERAN;
+    score_reset();
+    score_add_boss_kill();  /* 300 * 16 / 8 = 600 */
+    CHECK_EQ(score_get(), 600);
+}
+
+static void t_score_add_boss_kill_casual(void) {
+    g_test_diff = DIFF_CASUAL;
+    score_reset();
+    score_add_boss_kill();  /* 300 * 8 / 8 = 300 */
+    CHECK_EQ(score_get(), 300);
+}
+
 int main(void) {
     t_kill_base();
     t_wave_base();
@@ -158,6 +184,10 @@ int main(void) {
     t_score_add_wave_clear();
     t_score_add_win_bonus();
     t_score_saturation();
+    t_score_kill_boss_constant();
+    t_score_add_boss_kill_normal();
+    t_score_add_boss_kill_veteran();
+    t_score_add_boss_kill_casual();
     if (failures) {
         fprintf(stderr, "test_score: %d failure(s)\n", failures);
         return 1;

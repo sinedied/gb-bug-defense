@@ -657,7 +657,50 @@ DMG / mGBA). Run them after any change to `src/music.c` or
 
 ### Scenario 32: Title HI updates on selector cycle (iter-3 #19)
 1. On title, focus the difficulty selector and press LEFT/RIGHT.
-2. **Expected**: the `HI:` line on row 15 reflects the new
+2. **Expected**: the `HI:` line on row 16 reflects the new
    (map, difficulty) slot's stored score within one frame of the
    selector update (priority chain order: diff → map → focus → hi →
    prompt; each branch clears one dirty flag per frame).
+
+### Scenario 33: Title menu spacing (iter-7)
+1. Start game → observe title screen.
+2. **Expected**: Blank row between MAP selector (row 12) and PRESS START
+   (row 14). Blank row between PRESS START and HI line (row 16).
+
+### Scenario 34: Boss spawns at wave 5 (iter-7)
+1. Play to wave 5 (any difficulty, any map).
+2. **Expected**: After last regular enemy of wave 5 spawns + boss delay,
+   a boss enemy with distinct 3-point-crown sprite appears at the spawn
+   point. An 8×8 HP bar sprite (fully filled) hovers above the boss.
+
+### Scenario 35: Boss spawns at wave 10 (iter-7)
+1. Play to wave 10.
+2. **Expected**: Boss appears as the final spawn of wave 10 with the same
+   distinct sprite. HP bar visible above boss.
+
+### Scenario 36: Boss HP bar depletes (iter-7)
+1. Hit boss with towers.
+2. **Expected**: Bar transitions through 4 fill levels (100% → 75% → 50%
+   → 25%) as HP drops through thresholds.
+
+### Scenario 37: Boss kill reward (iter-7)
+1. Kill the W5 boss (Normal difficulty).
+2. **Expected**: Energy increases by 30. Score increases by 450
+   (300 × 1.5 Normal mult). SFX_ENEMY_DEATH plays. Boss sprite and HP
+   bar hide simultaneously.
+
+### Scenario 38: Boss leak damage (iter-7)
+1. Let boss reach computer.
+2. **Expected**: Computer HP drops by 3 (not 1). Boss and HP bar sprites
+   hide. No crash.
+
+### Scenario 39: Boss stun (iter-7)
+1. EMP tower stuns boss.
+2. **Expected**: Boss shows SPR_BOSS_STUN tile. Movement freezes for stun
+   duration. HP bar stays visible above the frozen boss.
+
+### Scenario 40: Late-wave HP scaling (iter-7)
+1. Play Normal to wave 7+.
+2. **Expected**: Enemies visibly take more hits to kill than in wave 1.
+   Robots survive noticeably longer. (Exact values verified by host
+   tests: W5 Bug=4, W10 Robot=18.)

@@ -43,6 +43,7 @@ typedef i16      fix8;          /* 8.8 fixed point */
 #define OAM_RANGE_COUNT 8
 #define OAM_ENEMIES_BASE 17   /* 17..30 (14 slots) */
 #define OAM_PROJ_BASE    31   /* 31..38 (8 slots) — was 29..36 in MVP */
+#define OAM_BOSS_BAR     39   /* iter-7: HP bar sprite above boss enemy */
 #define OAM_TOTAL        40
 
 /* Play field origin in screen tile coords. HUD on row 0. */

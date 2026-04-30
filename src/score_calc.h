@@ -12,6 +12,7 @@
 #define SCORE_KILL_BUG       10u
 #define SCORE_KILL_ROBOT     25u
 #define SCORE_KILL_ARMORED   50u
+#define SCORE_KILL_BOSS     300u   /* iter-7: base score for killing any boss */
 
 /* Win bonus base (pre-multiplier). */
 #define SCORE_WIN_BONUS    5000u

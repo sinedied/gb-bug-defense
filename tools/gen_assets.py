@@ -1253,6 +1253,96 @@ SPR_ARMORED_STUN = design_tile([
     "#.#..#.#",
 ])
 
+# Iter-7: Boss enemy walk frames. 3-point crowned mega-bug, 87.5% fill.
+# A/B differ by leg row (same 32-frame walk cadence as other enemies).
+SPR_BOSS_A = sprite_from_art([
+    "#.####.#",
+    "########",
+    "#+####+#",
+    "########",
+    "###++###",
+    "########",
+    ".######.",
+    "##....##",
+])
+SPR_BOSS_B = sprite_from_art([
+    "#.####.#",
+    "########",
+    "#+####+#",
+    "########",
+    "###++###",
+    "########",
+    ".######.",
+    ".##..##.",
+])
+
+# Iter-7: Boss flash (B→L, D→W per convention).
+SPR_BOSS_FLASH = design_tile([
+    ",.,,,,.,",
+    ",,,,,,,,",
+    ",.,,,,.,",
+    ",,,,,,,,",
+    ",,,..,,,",
+    ",,,,,,,,",
+    ".,,,,,,.",
+    ",,....,,",
+])
+
+# Iter-7: Boss stun (spark gaps at rows 3,5).
+SPR_BOSS_STUN = design_tile([
+    "#.####.#",
+    "########",
+    "#,####,#",
+    "#.####.#",
+    "###oo###",
+    "#.####.#",
+    ".######.",
+    "##....##",
+])
+
+# Iter-7: Boss HP bar tiles. 2-pixel-tall bar centered vertically.
+# Shade 3 (black '#') for filled, shade 1 (light grey ',') for empty.
+SPR_BOSS_BAR_1 = design_tile([
+    "........",
+    "........",
+    "........",
+    "##,,,,,,",
+    "##,,,,,,",
+    "........",
+    "........",
+    "........",
+])
+SPR_BOSS_BAR_2 = design_tile([
+    "........",
+    "........",
+    "........",
+    "####,,,,",
+    "####,,,,",
+    "........",
+    "........",
+    "........",
+])
+SPR_BOSS_BAR_3 = design_tile([
+    "........",
+    "........",
+    "........",
+    "######,,",
+    "######,,",
+    "........",
+    "........",
+    "........",
+])
+SPR_BOSS_BAR_4 = design_tile([
+    "........",
+    "........",
+    "........",
+    "########",
+    "########",
+    "........",
+    "........",
+    "........",
+])
+
 sprite_tiles = [
     ('SPR_CURSOR_A',    SPR_CURSOR_A),
     ('SPR_CURSOR_B',    SPR_CURSOR_B),
@@ -1298,6 +1388,15 @@ sprite_tiles = [
     ('SPR_BUG_STUN',      SPR_BUG_STUN),
     ('SPR_ROBOT_STUN',    SPR_ROBOT_STUN),
     ('SPR_ARMORED_STUN',  SPR_ARMORED_STUN),
+    # Iter-7: boss walk/flash/stun + HP bar (8 tiles).
+    ('SPR_BOSS_A',        SPR_BOSS_A),
+    ('SPR_BOSS_B',        SPR_BOSS_B),
+    ('SPR_BOSS_FLASH',    SPR_BOSS_FLASH),
+    ('SPR_BOSS_STUN',     SPR_BOSS_STUN),
+    ('SPR_BOSS_BAR_1',    SPR_BOSS_BAR_1),
+    ('SPR_BOSS_BAR_2',    SPR_BOSS_BAR_2),
+    ('SPR_BOSS_BAR_3',    SPR_BOSS_BAR_3),
+    ('SPR_BOSS_BAR_4',    SPR_BOSS_BAR_4),
 ]
 
 # ----------------------------------------------------------------------------
@@ -1379,7 +1478,7 @@ def title_map():
     rows[6]  = [S,S,S,S, BG_T, HL,HL,HL, S, CT,CR, S, HL,HL,HL, TW_T, S,S,S,S]
     rows[7]  = [S,S,S,S, BG_B, S,S,S,    S, CB,CX, S, S,S,S,    TW_B, S,S,S,S]
     # --- UI area (rows 10-17, selectors overwritten at runtime) ---
-    rows[13] = text_row("    PRESS START     ")
+    rows[14] = text_row("    PRESS START     ")
     return rows
 
 def win_map():
@@ -1701,7 +1800,15 @@ assets_h = """\
 #define SPR_BUG_STUN      40
 #define SPR_ROBOT_STUN    41
 #define SPR_ARMORED_STUN  42
-#define SPRITE_TILE_COUNT 43
+#define SPR_BOSS_A        43
+#define SPR_BOSS_B        44
+#define SPR_BOSS_FLASH    45
+#define SPR_BOSS_STUN     46
+#define SPR_BOSS_BAR_1    47
+#define SPR_BOSS_BAR_2    48
+#define SPR_BOSS_BAR_3    49
+#define SPR_BOSS_BAR_4    50
+#define SPRITE_TILE_COUNT 51
 
 extern const unsigned char font_tiles[];   /* 128 tiles * 16 bytes */
 extern const unsigned char map_tile_data[]; /* MAP_TILE_COUNT * 16 bytes */

@@ -79,4 +79,30 @@ static inline uint8_t difficulty_score_mult_num(uint8_t diff) {
     return 12u;
 }
 
+/* Iter-7: per-wave HP scaling curve (numerator/8).
+ * Wave 1–2 = identity (×1.0), gentle rise to wave 10 = ×3.0.
+ * Applied by difficulty_wave_enemy_hp() below. */
+static const uint8_t WAVE_HP_SCALE[10] = { 8, 8, 9, 10, 11, 13, 15, 17, 20, 24 };
+
+static inline uint8_t difficulty_wave_enemy_hp(uint8_t enemy_type, uint8_t diff, uint8_t wave_1based) {
+    uint8_t base = difficulty_enemy_hp(enemy_type, diff);
+    uint8_t idx = (wave_1based >= 1 && wave_1based <= 10) ? (uint8_t)(wave_1based - 1u) : 0u;
+    uint16_t scaled = ((uint16_t)base * WAVE_HP_SCALE[idx]) >> 3;
+    if (scaled > 255u) scaled = 255u;
+    if (scaled < 1u) scaled = 1u;
+    return (uint8_t)scaled;
+}
+
+/* Iter-7: Boss HP per (wave-tier, difficulty). Fixed values, NOT scaled by WAVE_HP_SCALE. */
+static const uint8_t BOSS_HP[2][3] = {
+    /* W5  */ { 20, 30, 40 },   /* Casual, Normal, Veteran */
+    /* W10 */ { 40, 60, 80 },   /* Casual, Normal, Veteran */
+};
+
+static inline uint8_t difficulty_boss_hp(uint8_t wave_1based, uint8_t diff) {
+    if (diff >= 3u) diff = 1u;
+    uint8_t tier = (wave_1based >= 10u) ? 1u : 0u;
+    return BOSS_HP[tier][diff];
+}
+
 #endif /* GBTD_DIFFICULTY_CALC_H */

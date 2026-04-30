@@ -119,6 +119,93 @@ static void test_t9_hp_floor(void) {
     }
 }
 
+/* T10 — Iter-7: wave HP scaling identity at wave 1 (WAVE_HP_SCALE[0]=8 → ×1.0). */
+static void test_t10_wave_hp_identity(void) {
+    /* Wave 1 values must match base (pre-scaling). */
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 1), BUG_HP);
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_NORMAL, 1), ROBOT_HP);
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_NORMAL, 1), ARMORED_HP);
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_CASUAL, 1), 1);
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_CASUAL, 1), 3);
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_CASUAL, 1), 6);
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_VETERAN, 1), 4);
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_VETERAN, 1), 7);
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_VETERAN, 1), 14);
+    /* Wave 2 also identity. */
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 2), BUG_HP);
+}
+
+/* T11 — Iter-7: wave 10 Normal exact values. */
+static void test_t11_wave10_normal(void) {
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 10), 9);   /* Bug: (3*24)>>3=9 */
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_NORMAL, 10), 18);  /* Robot: (6*24)>>3=18 */
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_NORMAL, 10), 36);  /* Armored: (12*24)>>3=36 */
+}
+
+/* T12 — Iter-7: wave 10 Veteran exact values. */
+static void test_t12_wave10_veteran(void) {
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_VETERAN, 10), 12);  /* (4*24)>>3=12 */
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_VETERAN, 10), 21);  /* (7*24)>>3=21 */
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_VETERAN, 10), 42);  /* (14*24)>>3=42 */
+}
+
+/* T13 — Iter-7: wave 10 Casual exact values. */
+static void test_t13_wave10_casual(void) {
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_CASUAL, 10), 3);   /* (1*24)>>3=3 */
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_CASUAL, 10), 9);   /* (3*24)>>3=9 */
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_CASUAL, 10), 18);  /* (6*24)>>3=18 */
+}
+
+/* T14 — Iter-7: Casual Bug floor — wave 1..7 stays at 1 (never 0). */
+static void test_t14_casual_bug_floor(void) {
+    unsigned w;
+    for (w = 1; w <= 7; w++) {
+        CHECK(difficulty_wave_enemy_hp(0, DIFF_CASUAL, (uint8_t)w) >= 1);
+    }
+}
+
+/* T15 — Iter-7: mid-wave spot checks (Normal W5 Bug=4, Robot=8). */
+static void test_t15_mid_wave(void) {
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 5), 4);   /* (3*11)>>3=4 (floor 4.125) */
+    CHECK_EQ(difficulty_wave_enemy_hp(1, DIFF_NORMAL, 5), 8);   /* (6*11)>>3=8 (floor 8.25) */
+    CHECK_EQ(difficulty_wave_enemy_hp(2, DIFF_NORMAL, 5), 16);  /* (12*11)>>3=16 */
+}
+
+/* T16 — Iter-7: out-of-range wave_1based (0, 11, 255) → treated as wave 1. */
+static void test_t16_oob_wave(void) {
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 0), BUG_HP);
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 11), BUG_HP);
+    CHECK_EQ(difficulty_wave_enemy_hp(0, DIFF_NORMAL, 255), BUG_HP);
+}
+
+/* T17 — Iter-7: difficulty_boss_hp W5 × 3 diffs. */
+static void test_t17_boss_hp_w5(void) {
+    CHECK_EQ(difficulty_boss_hp(5, DIFF_CASUAL),  20);
+    CHECK_EQ(difficulty_boss_hp(5, DIFF_NORMAL),  30);
+    CHECK_EQ(difficulty_boss_hp(5, DIFF_VETERAN), 40);
+}
+
+/* T18 — Iter-7: difficulty_boss_hp W10 × 3 diffs. */
+static void test_t18_boss_hp_w10(void) {
+    CHECK_EQ(difficulty_boss_hp(10, DIFF_CASUAL),  40);
+    CHECK_EQ(difficulty_boss_hp(10, DIFF_NORMAL),  60);
+    CHECK_EQ(difficulty_boss_hp(10, DIFF_VETERAN), 80);
+}
+
+/* T19 — Iter-7: Boss HP with garbage diff → Normal. */
+static void test_t19_boss_hp_junk_diff(void) {
+    CHECK_EQ(difficulty_boss_hp(5, 99), 30);   /* Normal W5 */
+    CHECK_EQ(difficulty_boss_hp(10, 255), 60); /* Normal W10 */
+}
+
+/* T20 — Iter-7: Boss HP tier boundary (wave <10 is tier 0, >=10 is tier 1). */
+static void test_t20_boss_hp_tier(void) {
+    CHECK_EQ(difficulty_boss_hp(1, DIFF_NORMAL), 30);  /* tier 0 */
+    CHECK_EQ(difficulty_boss_hp(9, DIFF_NORMAL), 30);  /* tier 0 */
+    CHECK_EQ(difficulty_boss_hp(10, DIFF_NORMAL), 60); /* tier 1 */
+    CHECK_EQ(difficulty_boss_hp(11, DIFF_NORMAL), 60); /* tier 1 */
+}
+
 int main(void) {
     test_t1_normal_identity();
     test_t2_casual_veteran_values();
@@ -129,6 +216,17 @@ int main(void) {
     test_t7_starting_energy();
     test_t8_cycle();
     test_t9_hp_floor();
+    test_t10_wave_hp_identity();
+    test_t11_wave10_normal();
+    test_t12_wave10_veteran();
+    test_t13_wave10_casual();
+    test_t14_casual_bug_floor();
+    test_t15_mid_wave();
+    test_t16_oob_wave();
+    test_t17_boss_hp_w5();
+    test_t18_boss_hp_w10();
+    test_t19_boss_hp_junk_diff();
+    test_t20_boss_hp_tier();
 
     if (failures) {
         fprintf(stderr, "test_difficulty: %d failure(s)\n", failures);

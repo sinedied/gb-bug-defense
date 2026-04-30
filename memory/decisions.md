@@ -705,3 +705,30 @@
 - **Decision**: (1) Add 6 new BG tiles to `gen_assets.py` (MAP_TILE_COUNT 53→59): `ENDSCR_STATIC` (dark CRT noise), `ENDSCR_BROKEN_HL` (fragmented circuit trace), `ENDSCR_SKULL_T/B` (game-over death icon), `ENDSCR_SHIELD_T/B` (victory defense icon). (2) Rewrite `win_map()` and `lose_map()` to compose art screens using the 6 new tiles + 10 existing title/gameplay tiles (BUG_T/B, TW_T/B, NODE, HLINE, COMP×4, COMP_D×4). (3) Headings use standard font glyphs ("GAME OVER" / "VICTORY!") — block letters rejected due to tile budget (would need 16–32 tiles). (4) No C source changes — `gameover.c` already blits `win_tilemap`/`lose_tilemap` and overlays score/banner/prompt at rows 13–15. (5) `gfx_init()` auto-loads via `MAP_TILE_COUNT` define — no code change needed.
 - **Rationale**: Purely data-driven approach = zero runtime risk. 6 tiles well within budget (69 slots remaining). Scene composition mirrors title screen layout (flanking icons + central computer + circuit traces) creating visual continuity. Lose screen uses dark static fills + bugs + damaged computer + skull; win screen uses clean whitespace + towers + healthy computer + shield — high contrast between moods.
 - **Alternatives**: Block-letter headings (rejected — "GAME OVER" = 8 unique letters × 4 tiles = 32+ tiles, exceeds reasonable budget); BGP palette swap for darker lose screen (rejected — affects all tiles including font text, making it unreadable); animation/cycling tiles (rejected — out of scope, adds runtime complexity for no gameplay value).
+
+### Iter-7: Per-wave HP scaling curve
+- **Date**: 2026-06-19
+- **Context**: User feedback: difficulty doesn't scale well — late waves (all modes) are too easy. Enemy HP is flat across all 10 waves while tower DPS scales 3–6× via upgrades.
+- **Decision**: Add `WAVE_HP_SCALE[10] = {8,8,9,10,11,13,15,17,20,24}` (numerator/8) to `difficulty_calc.h`. New `difficulty_wave_enemy_hp(type, diff, wave_1based)` applies both the existing difficulty table and the wave scale. `enemies_spawn` gains a `wave_1based` parameter. Wave 1–2 are identity (×1.0); wave 10 is ×3.0. No changes to spawn intervals, bounties, or energy income.
+- **Rationale**: Single lever (HP scaling) is sufficient — it implicitly reduces effective income (slower kills → slower bounties) and creates spawn-rate pressure (kill rate drops below spawn rate in late waves). Adding spawn-interval tightening or bounty reduction would risk over-correction. The quadratic-ish curve is gentle early (preserving balance) and steep late (addressing the feedback).
+- **Alternatives**: (A) Linear curve ×1.0–×2.0 (rejected — not steep enough for wave 10); (B) HP + spawn interval (rejected — two levers risk over-correction); (C) HP + bounty reduction (rejected — punitive feel); (D) mixed-archetype pressure (rejected — already present in waves 3–10).
+
+### Iter-7: Boss = is_boss flag on existing enemy slot, not new archetype
+- **Date**: 2026-06-19
+- **Context**: User requested boss enemies at waves 5 and 10. Need a way to represent a high-HP, distinct-sprite enemy without expanding the enemy type system.
+- **Decision**: Add `u8 is_boss` field to `enemy_t` (1 byte × 14 = 14 bytes WRAM). Module-level statics (`s_boss_speed`, `s_boss_bounty`, `s_boss_max_hp`, `s_boss_bar_thr[3]`) hold boss config since at most 1 boss exists at a time. Boss spawns via `enemies_spawn_boss(wave_1based)` which performs the full regular init then applies boss overrides. `SPAWN_BOSS = 0xFF` sentinel in wave script triggers boss spawn path.
+- **Rationale**: Reuses all spawn/move/render infrastructure. Module-level statics avoid adding wave-number or speed fields to every enemy. +21 bytes total WRAM is trivial. A new `ENEMY_BOSS` archetype would grow the stats table, require changes to every type-switch, and add a permanent 4th entry to HP/score/bounty tables.
+- **Alternatives**: (A) New ENEMY_BOSS type (rejected — grows stats table, changes all type-switches); (B) 16×16 composite sprite with 4 OAM (rejected — complex formation movement, 4 OAM slots); (C) Boss as separate non-pool entity (rejected — would bypass all existing targeting/damage/render code).
+
+### Iter-7: Boss HP bar uses OAM slot 39
+- **Date**: 2026-06-19
+- **Context**: Boss needs a visual HP indicator. OAM slot 39 has been reserved-unused since iter-1.
+- **Decision**: Boss HP bar = single 8×8 sprite at OAM slot 39, positioned 8px above the boss. 4 fill-level tiles (25/50/75/100%). Tile updated via threshold comparison (3 `if` statements) in `enemies_apply_damage` on damage. Position updated by `step_enemy` every frame. Hidden by `enemies_init`, `enemies_hide_all`, and on boss death/leak.
+- **Rationale**: No HUD layout change. OAM 39 is free. 4 tiles (64 bytes ROM) is minimal cost. Threshold comparison avoids division. Spatial proximity to the boss provides immediate feedback without cluttering the HUD.
+- **Alternatives**: (A) HUD-based bar (rejected — HUD row 0 fully occupied); (B) 8 fill levels (rejected — needs division for level computation); (C) No HP bar (rejected — user specifically asked for boss challenge; feedback on damage is essential).
+
+### Iter-7: Difficulty read sites — enemies_spawn_boss is a new gameplay-scaling consumer
+- **Date**: 2026-06-19
+- **Context**: Iter-3 #20 convention: "Three difficulty read sites only — enemies HP at spawn, waves spawn delay, economy starting energy." `enemies_spawn_boss` calls `difficulty_boss_hp(wave, diff)`.
+- **Decision**: `enemies_spawn_boss` is the 4th gameplay-scaling read site. It calls `game_difficulty()` for the boss HP lookup. Update `tests/test_difficulty.c` with boss HP test coverage. The existing `enemies_spawn` already reads difficulty; the boss spawn is an extension of the same module, not a new cross-module consumer.
+- **Rationale**: Minimal expansion of the convention. Boss HP is conceptually the same read site (enemy HP at spawn) — just a new code path within enemies.c.

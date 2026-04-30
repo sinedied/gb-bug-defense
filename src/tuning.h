@@ -104,4 +104,11 @@
 /* Iter-4 #31: range preview dwell threshold (frames). */
 #define RANGE_DWELL_FRAMES  15
 
+/* Iter-7: Boss enemies */
+#define BOSS_LEAK_DAMAGE    3      /* HP damage to computer if boss leaks */
+#define BOSS_BOUNTY_W5     30      /* energy awarded for killing W5 boss */
+#define BOSS_BOUNTY_W10    50      /* energy awarded for killing W10 boss */
+#define BOSS_SPEED       0x0060    /* 0.375 px/frame (between armored 0.25 and bug 0.5) */
+#define BOSS_SPAWN_DELAY   120     /* base delay (frames) before boss appears */
+
 #endif /* GBTD_TUNING_H */
