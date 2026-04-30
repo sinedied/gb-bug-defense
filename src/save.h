@@ -9,9 +9,15 @@
  * `enter_gameover` — never per-frame, never mid-game.
  *
  * SRAM access protocol (every transaction):
- *   ENABLE_RAM; SWITCH_RAM(0); read/write _SRAM[i]; DISABLE_RAM;
+ *   ENABLE_RAM; read/write _SRAM[i]; DISABLE_RAM;
  * `DISABLE_RAM` is always called before returning, even on read paths,
- * to minimise the power-loss corruption window. */
+ * to minimise the power-loss corruption window.
+ *
+ * No `SWITCH_RAM(0)` — the cart has a single 8 KB RAM bank (header byte
+ * 0x149 = 0x02), bank 0 is auto-selected. On MBC1 in default banking
+ * mode 0, `SWITCH_RAM` (writes 0x4000) sets the upper ROM bank bits,
+ * which crashes Goomba Color while being a harmless no-op everywhere
+ * else. See save.c for the full rationale. */
 
 #include "gtypes.h"
 

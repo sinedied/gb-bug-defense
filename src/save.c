@@ -9,12 +9,20 @@
 static u16 s_hi[SAVE_HI_COUNT];
 
 /* Read the 9-slot high-score table from SRAM into the cache. The caller
- * is expected to have already validated magic+version (via save_init). */
+ * is expected to have already validated magic+version (via save_init).
+ *
+ * Goomba Color compat (memory/decisions.md): NO `SWITCH_RAM(0)` call.
+ * The cart has a single 8 KB RAM bank (header byte 0x149 = 0x02), so
+ * bank 0 is auto-selected and no switch is needed. On MBC1 in default
+ * banking mode 0, writing to 0x4000 (what SWITCH_RAM expands to) sets
+ * the *upper ROM bank bits* — harmless on real DMG/mGBA/PyBoy, but
+ * crashes Goomba Color’s MBC1 emulator. Removing the call is fully
+ * spec-compliant for a single-bank-RAM cart and behaves identically
+ * everywhere we tested. */
 void save_load_highscores(void) {
     u8 i;
     u8 lo, hi;
     ENABLE_RAM;
-    SWITCH_RAM(0);
     for (i = 0; i < SAVE_HI_COUNT; i++) {
         lo = _SRAM[SAVE_OFF_HI + (u16)(i * 2u)];
         hi = _SRAM[SAVE_OFF_HI + (u16)(i * 2u) + 1u];
@@ -27,7 +35,6 @@ void save_init(void) {
     u8 hdr[6];
     u8 i;
     ENABLE_RAM;
-    SWITCH_RAM(0);
     for (i = 0; i < 6u; i++) hdr[i] = _SRAM[i];
     DISABLE_RAM;
 
@@ -48,7 +55,6 @@ void save_init(void) {
      * "valid header, garbage scores" hazard. */
     for (i = 0; i < SAVE_HI_COUNT; i++) s_hi[i] = 0;
     ENABLE_RAM;
-    SWITCH_RAM(0);
     for (i = 0; i < (u8)(SAVE_HI_COUNT * 2u); i++) {
         _SRAM[SAVE_OFF_HI + i] = 0;
     }
@@ -70,7 +76,6 @@ void save_write_hi(u8 map_id, u8 diff, u16 v) {
     u8 off  = save_slot_offset(map_id, diff);
     s_hi[slot] = v;
     ENABLE_RAM;
-    SWITCH_RAM(0);
     _SRAM[off + 0] = (u8)(v & 0xFFu);
     _SRAM[off + 1] = (u8)((v >> 8) & 0xFFu);
     DISABLE_RAM;

@@ -50,11 +50,19 @@ assets:
     python3 tools/gen_assets.py res/
 
 # Compile and link the ROM. Iter-3 #19: cart conversion to MBC1+RAM+BATT
-# 64 KB / 2 KB SRAM. Flag form is split per the canonical GBDK example
+# 64 KB / 8 KB SRAM. Flag form is split per the canonical GBDK example
 # (`vendor/gbdk/examples/cross-platform/banks/Makefile`):
 #   -Wl-yt0x03  → linker → byte 0x147 = 0x03 (MBC1+RAM+BATTERY)
 #   -Wm-yo4     → makebin → 4 ROM banks = 64 KB, byte 0x148 = 0x01
-#   -Wm-ya1     → makebin → 1 RAM bank  = 2 KB,  byte 0x149 = 0x01
+#   -Wm-ya1     → makebin → 1 RAM bank, byte 0x149 = 0x01 (= 2 KB,
+#                deprecated value)
+#   -Wm-yp0x149=0x02 → override 0x149 to 0x02 (= 8 KB, the canonical
+#                MBC1+RAM+BAT value). Byte 0x149 = 0x01 was never
+#                shipped on commercial carts and is mishandled by some
+#                GBA-hosted emulators (Goomba Color: white-screen +
+#                stuck audio at boot). We still only use the first
+#                ~24 bytes of bank 0 — see save_calc.h. The advertised
+#                size has no runtime cost.
 # The all-`-Wl-` form is silently ignored for `-yo`/`-ya`; `just check`
 # asserts the resulting header bytes so any flag-rejection regression
 # fails CI.
@@ -63,11 +71,12 @@ build: setup
     set -euo pipefail
     mkdir -p "{{OBJ}}"
     "{{LCC}}" -Isrc -Ires \
-      -Wl-yt0x03 -Wm-yo4 -Wm-ya1 -Wm-yp0x149=0x01 -Wm-ynBUGDEFENDER \
+      -Wl-yt0x03 -Wm-yo4 -Wm-ya1 -Wm-yp0x149=0x02 -Wm-ynBUGDEFENDER \
       -o "{{ROM}}" \
       src/*.c res/assets.c
     SIZE=$(wc -c < "{{ROM}}" | tr -d ' ')
     echo "Built {{ROM}} ($SIZE bytes)"
+
 
 # Validate ROM
 check: build test
@@ -87,8 +96,8 @@ check: build test
     if [ "$RS" != "01" ]; then
       echo "ROM size byte 0x148 != 0x01 (got 0x$RS)"; exit 1
     fi
-    if [ "$RA" != "01" ]; then
-      echo "RAM size byte 0x149 != 0x01 (got 0x$RA)"; exit 1
+    if [ "$RA" != "02" ]; then
+      echo "RAM size byte 0x149 != 0x02 (got 0x$RA)"; exit 1
     fi
     # Pan Docs header checksum (0x134..0x14C → byte 0x14D).
     EXPECT=$(od -An -tu1 -j 0x134 -N 25 "{{ROM}}" \
