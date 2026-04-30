@@ -1,5 +1,6 @@
 build/
 vendor/gbdk/
+web/
 .DS_Store
 *.lst
 *.map

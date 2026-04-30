@@ -1,8 +1,13 @@
-# justfile — Bug Defender build/run on macOS
-# Prereqs: `brew install just mgba`
+# justfile — Bug Defender build/run (macOS dev + Linux CI)
+# Prereqs (macOS dev): `brew install just mgba`
+# CI (Linux):           `apt-get install -y just python3 curl` (no mGBA needed)
 
 GBDK_VERSION := "4.2.0"
-GBDK_URL     := "https://github.com/gbdk-2020/gbdk-2020/releases/download/" + GBDK_VERSION + "/gbdk-macos.tar.gz"
+# GBDK ships per-OS release tarballs. Pick the right one based on the
+# host OS so the same `just build` works on macOS dev machines and on
+# the Linux GitHub-Actions runner.
+GBDK_PKG     := if os() == "macos" { "gbdk-macos.tar.gz" } else if os() == "linux" { "gbdk-linux64.tar.gz" } else { "gbdk-win64.zip" }
+GBDK_URL     := "https://github.com/gbdk-2020/gbdk-2020/releases/download/" + GBDK_VERSION + "/" + GBDK_PKG
 GBDK_DIR     := justfile_directory() + "/vendor/gbdk"
 LCC          := GBDK_DIR + "/bin/lcc"
 BUILD        := justfile_directory() + "/build"
@@ -11,22 +16,24 @@ ROM          := BUILD + "/bugdefender.gb"
 
 default: run
 
-# Install/verify GBDK + mGBA on macOS
+# Install/verify GBDK (+ mGBA on macOS dev hosts; mGBA is not required on Linux/CI).
 setup:
     #!/usr/bin/env bash
     set -euo pipefail
-    command -v mgba >/dev/null || { echo "mGBA missing — run: brew install mgba"; exit 1; }
-    # Apple Silicon needs Rosetta to run the x86_64 GBDK binaries. The
-    # `oahd` daemon used to be a reliable signal but isn't always running
-    # even when Rosetta is installed; instead, attempt a translated exec
-    # and treat success as proof Rosetta works.
-    if [[ "$(uname -m)" == "arm64" ]] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then
-      echo "Apple Silicon detected without Rosetta. Install with:"
-      echo "  softwareupdate --install-rosetta --agree-to-license"
-      exit 1
+    if [[ "$(uname)" == "Darwin" ]]; then
+      command -v mgba >/dev/null || { echo "mGBA missing — run: brew install mgba"; exit 1; }
+      # Apple Silicon needs Rosetta to run the x86_64 GBDK binaries. The
+      # `oahd` daemon used to be a reliable signal but isn't always running
+      # even when Rosetta is installed; instead, attempt a translated exec
+      # and treat success as proof Rosetta works.
+      if [[ "$(uname -m)" == "arm64" ]] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+        echo "Apple Silicon detected without Rosetta. Install with:"
+        echo "  softwareupdate --install-rosetta --agree-to-license"
+        exit 1
+      fi
     fi
     if [ ! -x "{{LCC}}" ]; then
-      echo "Downloading GBDK-2020 {{GBDK_VERSION}}..."
+      echo "Downloading GBDK-2020 {{GBDK_VERSION}} ({{GBDK_PKG}})..."
       mkdir -p "{{GBDK_DIR}}/.."
       TMP="$(mktemp -d)"
       curl -fL "{{GBDK_URL}}" -o "$TMP/gbdk.tar.gz"
@@ -202,8 +209,26 @@ run: build
 emulator:
     mgba -3 -C mute=0 -C volume=0x100 "{{ROM}}"
 
+# Export ROM as a self-contained, playable static web page (binjgb + DMG border).
+# Output goes to web/ — open with `just serve-web` or upload to any static host.
+# Scale=2 (320×288 canvas) fits the device shell cleanly; bump only with a CSS update.
+export-web: build
+    python3 tools/export_web.py "{{ROM}}" --output web/ --title "Bug Defender" --scale 2
+
+# Serve the exported web build locally on http://localhost:8080
+# Requires `just export-web` to have been run first.
+serve-web:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f web/index.html ]; then
+      echo "web/ not found — run 'just export-web' first."
+      exit 1
+    fi
+    echo "Serving web/ on http://localhost:8080  (Ctrl-C to stop)"
+    cd web && python3 -m http.server 8080
+
 clean:
-    rm -rf "{{BUILD}}"
+    rm -rf "{{BUILD}}" web
 
 clean-all: clean
     rm -rf "{{GBDK_DIR}}"
