@@ -90,6 +90,19 @@ def generate_simple_js(
             print(f"⚠️  Could not patch {name} in upstream simple.js — leaving as-is.")
         else:
             js = new_src
+
+    # Rebind Backspace from rewind to Select. Upstream binjgb maps
+    # Backspace -> keyRewind, but our README / on-screen hint document
+    # Backspace as Select (matching what most retro web players do).
+    # Tab is also bound to Select upstream, but Tab in a focused iframe
+    # commonly steals focus back to the parent doc, so Backspace is the
+    # only reliable Select key on desktop browsers.
+    bs_pattern = r"('Backspace'\s*:\s*)this\.keyRewind\.bind\(this\)"
+    new_src, n = re.subn(bs_pattern, r"\1this.setJoypSelect.bind(this)", js, count=1)
+    if n != 1:
+        print("⚠️  Could not rebind Backspace -> Select in simple.js.")
+    else:
+        js = new_src
     return js
 
 
@@ -416,6 +429,13 @@ def device_css(dmg_color: str, gbc_color: str) -> str:
       text-align: center;
       padding: 0 12px;
     }}
+    .gb-hint + .gb-hint {{ margin-top: calc(6 * var(--u)); }}
+    .gb-rom-link {{
+      color: rgba(255,255,255,0.55);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }}
+    .gb-rom-link:hover {{ color: rgba(255,255,255,0.9); }}
 """
 
 
@@ -529,6 +549,9 @@ def generate_index_html(
 
     <p class="gb-hint">
       Arrow keys · Z=A · X=B · Enter=Start · Backspace=Select · [ / ] = palette
+    </p>
+    <p class="gb-hint">
+      <a href="{rom_filename}" download class="gb-rom-link">Download .gb ROM</a>
     </p>
   </div>
 
